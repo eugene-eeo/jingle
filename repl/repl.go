@@ -57,7 +57,7 @@ const JINGLE_BELL = `    _
 `
 
 func printParserErrors(out io.Writer, errors []string) {
-	io.WriteString(out, JINGLE_BELL)
+	// io.WriteString(out, JINGLE_BELL)
 	io.WriteString(out, " parser errors:\n")
 	for _, msg := range errors {
 		io.WriteString(out, "\t"+msg+"\n")

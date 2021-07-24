@@ -414,7 +414,10 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 			// see parseExpressionList
 			break
 		}
-		p.nextToken() // now we're on top of the ident
+		if !p.expectPeek(token.IDENT) {
+			return nil
+		}
+		// p.nextToken() // now we're on top of the ident
 		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 		identifiers = append(identifiers, ident)
 	}
@@ -523,30 +526,24 @@ func (p *Parser) consumeOptionalSemicolon() bool {
 
 func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	list := []ast.Expression{}
-	if p.peekTokenIs(end) {
-		p.nextToken()
-		return list
-	}
-
 	p.nextToken()
-	list = append(list, p.parseExpression(LOWEST))
-
-	for p.peekTokenIs(token.COMMA) {
-		p.nextToken()
-		if p.peekTokenIs(end) {
-			// this conditional allows for trailing commas in the
-			// argument lists and lists: if we see that after a
-			// comma is the ending token, then we can terminate.
-			p.nextToken()
+	for {
+		if p.curTokenIs(end) {
 			return list
 		}
-		p.nextToken()
-		list = append(list, p.parseExpression(LOWEST))
+		expr := p.parseExpression(LOWEST)
+		list = append(list, expr)
+		if p.peekTokenIs(token.COMMA) {
+			p.nextToken()
+			p.nextToken()
+			continue
+		}
+		// Not a comma -- better be an END
+		if !p.expectPeek(end) {
+			return nil
+		}
+		return list
 	}
-	if !p.expectPeek(end) {
-		return nil
-	}
-	return list
 }
 
 func (p *Parser) peekPrecedence() int {
