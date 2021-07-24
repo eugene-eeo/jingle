@@ -998,8 +998,8 @@ func TestSemicolonRules(t *testing.T) {
 		{"return 1 false", true},
 		{"if (false) { return [1,2] 1 }", true},
 		// === ExpressionStatement ===
-		{"if (false) { 2 } 1", true},
-		{"fn (x') { } 1", true},
+		{"if (false) { 2 } 1", false},
+		{"fn (x') { } 1", false},
 		{"1 1", true},
 	}
 

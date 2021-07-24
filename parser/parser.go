@@ -159,9 +159,9 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 func (p *Parser) parseStatement() (ast.Statement, bool) {
 	// Semicolon rules:
-	// LET, RETURN, SET, and ExpressionStatements _always_ require a
-	// semicolon before the last statement. The last semicolon is
-	// optional.
+	// LET, RETURN, and SET _always_ requires a semicolon before the
+	// last statement. Otherwise, if we're in an ExpressionStatement,
+	// then only functions and if statements do not require a semicolon.
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
@@ -171,7 +171,17 @@ func (p *Parser) parseStatement() (ast.Statement, bool) {
 		if p.curTokenIs(token.IDENT) && p.peekTokenIs(token.ASSIGN) {
 			return p.parseSetStatement()
 		}
-		return p.parseExpressionStatement()
+		stmt, hasSemicolon := p.parseExpressionStatement()
+		if !hasSemicolon && stmt != nil {
+			exprStmt := stmt.(*ast.ExpressionStatement)
+			switch exprStmt.Expression.(type) {
+			case *ast.IfExpression:
+				hasSemicolon = true
+			case *ast.FunctionLiteral:
+				hasSemicolon = true
+			}
+		}
+		return stmt, hasSemicolon
 	}
 }
 
