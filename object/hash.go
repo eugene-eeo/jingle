@@ -70,6 +70,8 @@ const (
 	hashTableRehashRatio = 0.25
 )
 
+var rng = rand.New(rand.NewSource(31419265))
+
 type HashTableEntry struct {
 	Key   Hashable
 	Value Object
@@ -93,14 +95,17 @@ func (hte *HashTableEntry) keyEquals(obj Hashable) bool {
 }
 
 type HashTable struct {
-	// We are using cuckoo hashing.
+	// We are using Cuckoo Hashing!
 	// The tableSize is initially 16, and is doubled every
 	// time we fail to allocate :'(. tableSize is _always_
 	// a power of two. The size field is the _actual_ size
 	// of the table.
 	tableSize uint64
 	size      uint64
-	// seeds for the two hash functions
+	// The seeds for the two hash functions. Note that we
+	// calculate the hash of an object as object.Hash() ^ seed.
+	// Assuming that each bit in the seed has uniform probability
+	// I guess this is fine?
 	seed1 uint64
 	seed2 uint64
 	// len(array) == tableSize
@@ -191,10 +196,27 @@ func (ht *HashTable) Set(key Hashable, val Object) {
 	ht.Set(toInsert.Key, toInsert.Value)
 }
 
+// bytes2uint64 converts a byte slice into a uint64 number.
+// It doesn't matter whether we go big/small/middle-endian:
+// these integers are used internally anyways.
+func bytes2uint64(b [8]byte) uint64 {
+	i := uint64(0)
+	for _, ch := range b {
+		i <<= 8
+		i |= uint64(ch)
+	}
+	return i
+}
+
 func (ht *HashTable) rehash(grow bool) {
+	s1 := [8]byte{}
+	s2 := [8]byte{}
+	rng.Read(s1[:])
+	rng.Read(s2[:])
+	ht.seed1 = bytes2uint64(s1)
+	ht.seed2 = bytes2uint64(s2)
+	// reset the size here, because of follow-up Set(...)s
 	ht.size = 0
-	ht.seed1 = rand.Uint64()
-	ht.seed2 = rand.Uint64()
 	if grow {
 		ht.tableSize *= 2
 	} else {
