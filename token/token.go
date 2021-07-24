@@ -5,6 +5,8 @@ type TokenType string
 type Token struct {
 	Type    TokenType
 	Literal string // The contents of the token (what was consumed)
+	LineNo  int
+	Column  int
 }
 
 const (
