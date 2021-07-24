@@ -32,25 +32,30 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return &object.ReturnValue{Value: value}
 
-	// Warning: these two statements return <nil>
-	// explicitly -- remember to handle them!
 	case *ast.LetStatement:
+		// Warning: this returns <nil> explicitly: remember
+		// to handle it!
 		value := Eval(node.Value, env)
 		if isError(value) {
 			return value
 		}
 		env.Let(node.Name.Value, value)
-	case *ast.SetStatement:
-		if !env.Has(node.Name.Value) {
-			return newError("identifier not found: %s", node.Name.Value)
-		}
-		value := Eval(node.Value, env)
-		if isError(value) {
-			return value
-		}
-		env.Set(node.Name.Value, value)
+		return nil
 
 	// ==== Expressions ====
+	case *ast.SetExpression:
+		switch left := node.Left.(type) {
+		case *ast.Identifier:
+			if !env.Has(left.Value) {
+				return newError("identifier not found: %s", left.Value)
+			}
+			value := Eval(node.Right, env)
+			if isError(value) {
+				return value
+			}
+			env.Set(left.Value, value)
+			return NULL
+		}
 	case *ast.PrefixExpression:
 		right := Eval(node.Right, env)
 		if isError(right) {

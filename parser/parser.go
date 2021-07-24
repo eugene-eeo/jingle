@@ -12,6 +12,7 @@ import (
 const (
 	_ int = iota
 	LOWEST
+	SET         // =
 	OR          // || or &&
 	IS          // is
 	EQUALS      // == or !=
@@ -29,6 +30,7 @@ type (
 )
 
 var precedences = map[token.TokenType]int{
+	token.ASSIGN:   SET,
 	token.EQ:       EQUALS,
 	token.NOT_EQ:   EQUALS,
 	token.AND:      OR,
@@ -95,6 +97,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.AND, p.parseInfixExpression)
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(token.IS, p.parseInfixExpression)
+	p.registerInfix(token.ASSIGN, p.parseSetExpression)
 
 	// Read two tokens, so curToken and peekToken are set
 	p.nextToken()
@@ -168,9 +171,6 @@ func (p *Parser) parseStatement() (ast.Statement, bool) {
 	case token.RETURN:
 		return p.parseReturnStatement()
 	default:
-		if p.curTokenIs(token.IDENT) && p.peekTokenIs(token.ASSIGN) {
-			return p.parseSetStatement()
-		}
 		stmt, hasSemicolon := p.parseExpressionStatement()
 		if !hasSemicolon && stmt != nil {
 			exprStmt := stmt.(*ast.ExpressionStatement)
@@ -194,18 +194,6 @@ func (p *Parser) parseLetStatement() (ast.Statement, bool) {
 	if !p.expectPeek(token.ASSIGN) {
 		return nil, true
 	}
-	p.nextToken()
-	stmt.Value = p.parseExpression(LOWEST)
-	hasSemicolon := p.consumeOptionalSemicolon()
-	return stmt, hasSemicolon
-}
-
-func (p *Parser) parseSetStatement() (ast.Statement, bool) {
-	// curToken == IDENT, peekToken == ASSIGN
-	stmt := &ast.SetStatement{}
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	p.nextToken()
-	stmt.Token = p.curToken
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
 	hasSemicolon := p.consumeOptionalSemicolon()
@@ -473,6 +461,17 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 		}
 		return hash
 	}
+}
+
+func (p *Parser) parseSetExpression(left ast.Expression) ast.Expression {
+	assignableStmt, ok := left.(ast.Assignable)
+	if !ok {
+		p.pushError("cannot assign to %T", left)
+	}
+	expr := &ast.SetExpression{Left: assignableStmt, Token: p.curToken}
+	p.nextToken()
+	expr.Right = p.parseExpression(LOWEST)
+	return expr
 }
 
 // ================

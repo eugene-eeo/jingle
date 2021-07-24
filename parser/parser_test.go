@@ -169,7 +169,7 @@ func testArrayLiteral(t *testing.T, exp ast.Expression, value Array) bool {
 func testHashLiteral(t *testing.T, exp ast.Expression, value Hash) bool {
 	hash, ok := exp.(*ast.HashLiteral)
 	if !ok {
-		t.Errorf("exp not *ast.ArrayLiteral. got=%T(%+v)", exp, exp)
+		t.Errorf("exp not *ast.HashLiteral. got=%T(%+v)", exp, exp)
 		return false
 	}
 	if hash.TokenLiteral() != "{" {
@@ -185,6 +185,31 @@ func testHashLiteral(t *testing.T, exp ast.Expression, value Hash) bool {
 		if !testLiteralExpression(t, hash.Pairs[i].Key, test.Key) || !testLiteralExpression(t, hash.Pairs[i].Value, test.Value) {
 			return false
 		}
+	}
+	return true
+}
+
+func testSetExpression(
+	t *testing.T,
+	expr ast.Expression,
+	left interface{},
+	right interface{},
+) bool {
+	setExpr, ok := expr.(*ast.SetExpression)
+	if !ok {
+		t.Errorf("expr not *ast.SetExpression. got=%T(%+v)", expr, expr)
+		return false
+	}
+	if setExpr.TokenLiteral() != "=" {
+		t.Errorf("setExpr.TokenLiteral() not %q. got=%q",
+			"=", setExpr.TokenLiteral())
+		return false
+	}
+	if !testLiteralExpression(t, setExpr.Left, left) {
+		return false
+	}
+	if !testLiteralExpression(t, setExpr.Right, right) {
+		return false
 	}
 	return true
 }
@@ -277,26 +302,6 @@ func testReturnStatement(t *testing.T, s ast.Statement, value interface{}) bool 
 		return false
 	}
 	val := retStmt.ReturnValue
-	if !testLiteralExpression(t, val, value) {
-		return false
-	}
-	return true
-}
-
-func testSetStatement(t *testing.T, s ast.Statement, name string, value interface{}) bool {
-	if s.TokenLiteral() != "=" {
-		t.Fatalf("s.TokenLiteral not '='. got=%q", s.TokenLiteral())
-		return false
-	}
-	setStmt, ok := s.(*ast.SetStatement)
-	if !ok {
-		t.Errorf("s not *ast.SetStatement. got=%T", s)
-		return false
-	}
-	if !testIdentifier(t, setStmt.Name, name) {
-		return false
-	}
-	val := setStmt.Value
 	if !testLiteralExpression(t, val, value) {
 		return false
 	}
@@ -420,34 +425,46 @@ func TestLetStatements(t *testing.T) {
 	}
 }
 
-func TestSetStatements(t *testing.T) {
+func TestBadSetExpressions(t *testing.T) {
 	tests := []struct {
-		input              string
-		expectedIdentifier string
-		expectedValue      interface{}
+		input     string
+		hasErrors bool
+		left      interface{}
+		right     interface{}
 	}{
-		{"x = 5;", "x", 5},
-		{"y = true;", "y", true},
-		{"foobar = y;", "foobar", "y"},
-		{"u = null;", "u", Null{}},
+		{"x = 5", false, "x", 5},
+		{"x = y", false, "x", "y"},
+		{"x = null", false, "x", Null{}},
+		{"x[1] = 1", true, nil, nil},
+		{"[1,2,3] = 1", true, nil, nil},
+		{"{1:2} = 1", true, nil, nil},
+		{`"a" = 1`, true, nil, nil},
+		{`1 = 1`, true, nil, nil},
+		{`true = 1`, true, nil, nil},
+		{`false = 1`, true, nil, nil},
+		{`null = 1`, true, nil, nil},
+		// cannot hide behind a ()
+		{`(null) = 1`, true, nil, nil},
+		{`(1 + 1) = 1`, true, nil, nil},
 	}
-	for _, tt := range tests {
+	for i, tt := range tests {
 		l := lexer.New(tt.input)
 		p := parser.New(l)
-
 		program := p.ParseProgram()
-		checkParserErrors(t, p)
-
-		if program == nil {
-			t.Fatalf("ParseProgram() returned nil")
+		if !testParserErrors(t, p, tt.hasErrors) {
+			t.Errorf("tests[%d]: expected parsing hasErrors=%t",
+				i, tt.hasErrors)
+		}
+		if tt.hasErrors {
+			continue
 		}
 		if len(program.Statements) != 1 {
 			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
 				len(program.Statements))
 		}
-		stmt := program.Statements[0]
-		if !testSetStatement(t, stmt, tt.expectedIdentifier, tt.expectedValue) {
-			return
+		expr := program.Statements[0].(*ast.ExpressionStatement)
+		if !testSetExpression(t, expr.Expression, tt.left, tt.right) {
+			t.Fatalf("tests[%d]: failed to parse correctly", i)
 		}
 	}
 }
@@ -894,11 +911,11 @@ return a;
 		return
 	}
 	let := program.Statements[0].(*ast.LetStatement)
-	set := program.Statements[1].(*ast.SetStatement)
+	set := program.Statements[1].(*ast.ExpressionStatement)
 	ret := program.Statements[2].(*ast.ReturnStatement)
 
 	testLetStatement(t, let, "a", 1)
-	testSetStatement(t, set, "a", 2)
+	testSetExpression(t, set.Expression, "a", 2)
 	testReturnStatement(t, ret, "a")
 }
 
