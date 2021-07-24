@@ -83,6 +83,21 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return applyFunction(fn, args)
 
+	// Short-Circuiting operators || and &&
+	case *ast.OrExpression:
+		left := Eval(node.Left, env)
+		if isError(left) || isTruthy(left) {
+			return left
+		}
+		return Eval(node.Right, env)
+	case *ast.AndExpression:
+		left := Eval(node.Left, env)
+		if isError(left) || !isTruthy(left) {
+			return left
+		}
+		return Eval(node.Right, env)
+
+	// ===== Literals =====
 	case *ast.FunctionLiteral:
 		return &object.Function{
 			Parameters: node.Parameters,
@@ -330,15 +345,6 @@ func evalInfixExpression(operator string, left, right object.Object) object.Obje
 		return nativeBoolToBooleanObject(left == right)
 	case operator == "!=":
 		return nativeBoolToBooleanObject(left != right)
-	case left.Type() == object.BOOLEAN_OBJ && right.Type() == object.BOOLEAN_OBJ:
-		left := left.(*object.Boolean).Value
-		right := right.(*object.Boolean).Value
-		switch operator {
-		case "||":
-			return nativeBoolToBooleanObject(left || right)
-		case "&&":
-			return nativeBoolToBooleanObject(left && right)
-		}
 	case left.Type() != right.Type():
 		return newError("type mismatch: %s %s %s",
 			left.Type(), operator, right.Type())

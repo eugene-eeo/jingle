@@ -93,11 +93,11 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.LEQ, p.parseInfixExpression)
 	p.registerInfix(token.GEQ, p.parseInfixExpression)
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
-	p.registerInfix(token.OR, p.parseInfixExpression)
-	p.registerInfix(token.AND, p.parseInfixExpression)
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerInfix(token.IS, p.parseInfixExpression)
 	p.registerInfix(token.ASSIGN, p.parseSetExpression)
+	p.registerInfix(token.OR, p.parseOrExpression)
+	p.registerInfix(token.AND, p.parseAndExpression)
 
 	// Read two tokens, so curToken and peekToken are set
 	p.nextToken()
@@ -484,6 +484,28 @@ func (p *Parser) parseSetExpression(left ast.Expression) ast.Expression {
 	p.nextToken()
 	expr.Right = p.parseExpression(LOWEST)
 	return expr
+}
+
+func (p *Parser) parseOrExpression(left ast.Expression) ast.Expression {
+	expression := &ast.OrExpression{
+		Token: p.curToken,
+		Left:  left,
+	}
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+	return expression
+}
+
+func (p *Parser) parseAndExpression(left ast.Expression) ast.Expression {
+	expression := &ast.AndExpression{
+		Token: p.curToken,
+		Left:  left,
+	}
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+	return expression
 }
 
 // ================

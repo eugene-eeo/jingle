@@ -214,6 +214,56 @@ func testSetExpression(
 	return true
 }
 
+func testOrExpression(
+	t *testing.T,
+	expr ast.Expression,
+	left interface{},
+	right interface{},
+) bool {
+	orExpr, ok := expr.(*ast.OrExpression)
+	if !ok {
+		t.Errorf("expr not *ast.OrExpression. got=%T(%+v)", expr, expr)
+		return false
+	}
+	if orExpr.TokenLiteral() != "||" {
+		t.Errorf("orExpr.TokenLiteral() not %q. got=%q",
+			"||", orExpr.TokenLiteral())
+		return false
+	}
+	if !testLiteralExpression(t, orExpr.Left, left) {
+		return false
+	}
+	if !testLiteralExpression(t, orExpr.Right, right) {
+		return false
+	}
+	return true
+}
+
+func testAndExpression(
+	t *testing.T,
+	expr ast.Expression,
+	left interface{},
+	right interface{},
+) bool {
+	andExpr, ok := expr.(*ast.AndExpression)
+	if !ok {
+		t.Errorf("expr not *ast.AndExpression. got=%T(%+v)", expr, expr)
+		return false
+	}
+	if andExpr.TokenLiteral() != "&&" {
+		t.Errorf("andExpr.TokenLiteral() not %q. got=%q",
+			"&&", andExpr.TokenLiteral())
+		return false
+	}
+	if !testLiteralExpression(t, andExpr.Left, left) {
+		return false
+	}
+	if !testLiteralExpression(t, andExpr.Right, right) {
+		return false
+	}
+	return true
+}
+
 func testLiteralExpression(
 	t *testing.T,
 	exp ast.Expression,
@@ -557,6 +607,38 @@ func TestParsingPrefixExpressions(t *testing.T) {
 	}
 }
 
+func TestParsingShortCircuitingExpressions(t *testing.T) {
+	infixTests := []struct {
+		input    string
+		left     interface{}
+		operator string
+		right    interface{}
+	}{
+		{"true && true;", true, "&&", true},
+		{"true || true;", true, "||", true},
+		{`"abc" || "def";`, String{"abc"}, "||", String{"def"}},
+		{"true && false;", true, "&&", false},
+		{"[1,2,3] && false;", Array{1, 2, 3}, "&&", false},
+		{"null || [1,2];", Null{}, "||", Array{1, 2}},
+		{"null || {1:2};", Null{}, "||", Hash{{1, 2}}},
+	}
+	for i, tt := range infixTests {
+		var fn ExprTestFunc
+		if tt.operator == "&&" {
+			fn = ExprTestFunc(func(node ast.Expression) bool {
+				return testAndExpression(t, node, tt.left, tt.right)
+			})
+		} else {
+			fn = ExprTestFunc(func(node ast.Expression) bool {
+				return testOrExpression(t, node, tt.left, tt.right)
+			})
+		}
+		if !testParseExpressionStatement(t, tt.input, fn) {
+			t.Errorf("tests[%d]: failed parsing %q", i, tt.input)
+		}
+	}
+}
+
 func TestParsingInfixExpressions(t *testing.T) {
 	infixTests := []struct {
 		input    string
@@ -581,9 +663,6 @@ func TestParsingInfixExpressions(t *testing.T) {
 		{"true != false;", true, "!=", false},
 		{"a != true;", "a", "!=", true},
 		{"a != null;", "a", "!=", Null{}},
-		{"true && true;", true, "&&", true},
-		{"true || true;", true, "||", true},
-		{`"abc" || "def";`, String{"abc"}, "||", String{"def"}},
 		{`"abc" + "def";`, String{"abc"}, "+", String{"def"}},
 		{`"abc" <= "def";`, String{"abc"}, "<=", String{"def"}},
 		{`a is a;`, "a", "is", "a"},
@@ -991,7 +1070,7 @@ func TestParsingHashLiterals(t *testing.T) {
 		}},
 		{`{1 + 2: true || false,}`, Hash{{
 			ExprTestFunc(func(e ast.Expression) bool { return testInfixExpression(t, e, 1, "+", 2) }),
-			ExprTestFunc(func(e ast.Expression) bool { return testInfixExpression(t, e, true, "||", false) }),
+			ExprTestFunc(func(e ast.Expression) bool { return testOrExpression(t, e, true, false) }),
 		}}},
 	}
 	for i, tt := range tests {

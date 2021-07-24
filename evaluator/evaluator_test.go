@@ -255,10 +255,6 @@ func TestErrorHandling(t *testing.T) {
 		{"5 + true;", "type mismatch: INTEGER + BOOLEAN"},
 		{"5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"},
 		{"(5 + true) + 5;", "type mismatch: INTEGER + BOOLEAN"},
-		{"true || -true;", "unknown operator: -BOOLEAN"},
-		{"5 || 5;", "unknown operator: INTEGER || INTEGER"},
-		{"5 && 5;", "unknown operator: INTEGER && INTEGER"},
-		{"5 && true;", "type mismatch: INTEGER && BOOLEAN"},
 		{"-true;", "unknown operator: -BOOLEAN"},
 		{"true + false;", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"},
@@ -464,6 +460,37 @@ func TestHashLiterals(t *testing.T) {
 		evaluated := testEval(t, tt.input)
 		if !testObject(t, evaluated, tt.expected) {
 			t.Errorf("tests[%d]: failed evaluating %q", i, tt.input)
+		}
+	}
+}
+
+func TestShortCircuit(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{"if (true || explode()) { 1 }", 1},
+		{"if (false && explode()) { explode() } else { 2 }", 2},
+		{"if (1) { 2 } else { explode() }", 2},
+		{"true || a", true},
+		{"1 || a", 1},
+		{"2 || b", 2},
+		{"false && b", false},
+		{"{} && b", Error{nil}},
+	}
+	for i, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		env := object.NewEnvironment()
+		env.Set("explode", &object.Builtin{
+			Fn: func(args ...object.Object) object.Object {
+				return &object.Error{Message: "HEY!"}
+			},
+		})
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+		if !testObject(t, evaluator.Eval(program, env), tt.expected) {
+			t.Errorf("tests[%d]: failed", i)
 		}
 	}
 }

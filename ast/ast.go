@@ -179,6 +179,46 @@ func (ie *InfixExpression) String() string {
 	return out.String()
 }
 
+type OrExpression struct {
+	Token token.Token // '||' token
+	Left  Expression
+	Right Expression
+}
+
+func (oe *OrExpression) expressionNode()      {}
+func (oe *OrExpression) TokenLiteral() string { return oe.Token.Literal }
+func (oe *OrExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(oe.Left.String())
+	out.WriteString(" || ")
+	out.WriteString(oe.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
+
+type AndExpression struct {
+	Token token.Token // '&&' token
+	Left  Expression
+	Right Expression
+}
+
+func (ae *AndExpression) expressionNode()      {}
+func (ae *AndExpression) TokenLiteral() string { return ae.Token.Literal }
+func (ae *AndExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(ae.Left.String())
+	out.WriteString(" && ")
+	out.WriteString(ae.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
+
 type IfExpression struct {
 	Token       token.Token // The 'if' token
 	Condition   Expression
