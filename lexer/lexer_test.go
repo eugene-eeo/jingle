@@ -1,8 +1,8 @@
 package lexer_test
 
 import (
-	"monkey/lexer"
-	"monkey/token"
+	"jingle/lexer"
+	"jingle/token"
 	"testing"
 )
 
@@ -162,9 +162,9 @@ a <= b;
 	for i, tt := range tests {
 		tok := l.NextToken()
 		if tok.Type != tt.expectedType {
-			// t.Fatalf("tests[%d]: tokentype wrong. expected=%q, got=%q",
-			// 	i, tt.expectedType, tok.Type)
-			t.Fatalf("tests[%d]: %T(%+v)", i, tok, tok)
+			t.Fatalf("tests[%d]: tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+			// t.Fatalf("tests[%d]: %T(%+v)", i, tok, tok)
 		}
 		if tok.Literal != tt.expectedLiteral {
 			t.Fatalf("tests[%d]: literal wrong. expected=%q, got=%q",
@@ -173,7 +173,43 @@ a <= b;
 	}
 }
 
-func TestStringParsing(t *testing.T) {
+func TestLexIdentifier(t *testing.T) {
+	type testToken struct {
+		_type token.TokenType
+		lit   string
+	}
+	tests := []struct {
+		input  string
+		tokens []testToken
+	}{
+		{"a", []testToken{{token.IDENT, "a"}}},
+		{"a1", []testToken{{token.IDENT, "a1"}}},
+		{"_1", []testToken{{token.IDENT, "_1"}}},
+		{"f'", []testToken{{token.IDENT, "f'"}}},
+		{"'f", []testToken{{token.ILLEGAL, "'"}, {token.IDENT, "f"}}},
+	}
+	for i, test := range tests {
+		l := lexer.New(test.input)
+		for j, tt := range test.tokens {
+			tok := l.NextToken()
+			if tok.Type != tt._type {
+				t.Fatalf("tests[%d][%d]: tokentype wrong. expected=%q, got=%q",
+					i, j, tt._type, tok.Type)
+			}
+			if tok.Literal != tt.lit {
+				t.Fatalf("tests[%d]: literal wrong. expected=%q, got=%q",
+					i, tt.lit, tok.Literal)
+			}
+		}
+		tok := l.NextToken()
+		if tok.Type != token.EOF {
+			t.Fatalf("tests[%d]: tokentype wrong. expected=%q, got=%q",
+				i, token.EOF, tok.Type)
+		}
+	}
+}
+
+func TestLexString(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected interface{}

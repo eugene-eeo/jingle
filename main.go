@@ -1,7 +1,7 @@
 package main
 
 import (
-	"monkey/repl"
+	"jingle/repl"
 	"os"
 )
 

@@ -3,7 +3,7 @@ package object
 import (
 	"bytes"
 	"fmt"
-	"monkey/ast"
+	"jingle/ast"
 	"strings"
 )
 
@@ -129,14 +129,18 @@ func (ho *Hash) Type() ObjectType { return HASH_OBJ }
 func (ho *Hash) Inspect() string {
 	var out bytes.Buffer
 	elements := make([]string, ho.Pairs.Size())
-	for i, e := range ho.Pairs.array {
-		elements[i] = e.Key.Inspect() + ": "
+	i := 0
+	for _, e := range ho.Pairs.array {
+		if e.empty() {
+			continue
+		}
 		if e.Value == ho {
 			// avoid exploding on a self-referential value
-			elements[i] += "[...]"
+			elements[i] = e.Key.Inspect() + ": {...}"
 		} else {
-			elements[i] += e.Value.Inspect()
+			elements[i] = e.Key.Inspect() + ": " + e.Value.Inspect()
 		}
+		i++
 	}
 	out.WriteString("{")
 	out.WriteString(strings.Join(elements, ", "))

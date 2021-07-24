@@ -2,7 +2,7 @@ package evaluator
 
 import (
 	"fmt"
-	"monkey/object"
+	"jingle/object"
 )
 
 // === Util functions ====

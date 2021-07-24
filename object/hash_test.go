@@ -1,7 +1,7 @@
 package object_test
 
 import (
-	"monkey/object"
+	"jingle/object"
 	"testing"
 )
 

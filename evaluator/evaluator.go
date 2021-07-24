@@ -2,8 +2,8 @@ package evaluator
 
 import (
 	"fmt"
-	"monkey/ast"
-	"monkey/object"
+	"jingle/ast"
+	"jingle/object"
 )
 
 var (
@@ -31,6 +31,9 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return value
 		}
 		return &object.ReturnValue{Value: value}
+
+	// Warning: these two statements return <nil>
+	// explicitly -- remember to handle them!
 	case *ast.LetStatement:
 		value := Eval(node.Value, env)
 		if isError(value) {

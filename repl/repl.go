@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"monkey/evaluator"
-	"monkey/lexer"
-	"monkey/object"
-	"monkey/parser"
+	"jingle/evaluator"
+	"jingle/lexer"
+	"jingle/object"
+	"jingle/parser"
+	"os"
 )
 
 const PROMPT = ">> "
@@ -15,6 +16,13 @@ const PROMPT = ">> "
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	env := object.NewEnvironment()
+	env.Set("exit", &object.Builtin{
+		Fn: func(args ...object.Object) object.Object {
+			os.Exit(0)
+			return evaluator.NULL
+		},
+	})
+	io.WriteString(out, JINGLE_BELL)
 
 	for {
 		fmt.Fprintf(out, PROMPT)
@@ -41,22 +49,14 @@ func Start(in io.Reader, out io.Writer) {
 	}
 }
 
-const MONKEY_FACE = `            __,__
-   .--.  .-"     "-.  .--.
-  / .. \/  .-. .-.  \/ .. \
- | |  '|  /   Y   \  |'  | |
- | \   \  \ 0 | 0 /  /   / |
-  \ '- ,\.-"""""""-./, -' /
-   ''-' /_   ^ ^   _\ '-''
-       |  \._   _./  |
-       \   \ '~' /   /
-        '._ '-=-' _.'
-           '-----'
+const JINGLE_BELL = `    _
+   /\` + "`" + `--.
+  |o-|   )>=====o
+   \/.--'
 `
 
 func printParserErrors(out io.Writer, errors []string) {
-	io.WriteString(out, MONKEY_FACE)
-	io.WriteString(out, "Woops! We ran into some monkey business here!\n")
+	io.WriteString(out, JINGLE_BELL)
 	io.WriteString(out, " parser errors:\n")
 	for _, msg := range errors {
 		io.WriteString(out, "\t"+msg+"\n")

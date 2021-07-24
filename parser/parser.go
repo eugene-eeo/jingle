@@ -2,9 +2,9 @@ package parser
 
 import (
 	"fmt"
-	"monkey/ast"
-	"monkey/lexer"
-	"monkey/token"
+	"jingle/ast"
+	"jingle/lexer"
+	"jingle/token"
 	"strconv"
 )
 
@@ -110,14 +110,22 @@ func (p *Parser) registerInfix(t token.TokenType, fn infixParseFn) {
 	p.infixParseFns[t] = fn
 }
 
+// =====================
+// Parser Error Handling
+// =====================
+
 func (p *Parser) Errors() []string {
 	return p.errors
 }
 
-func (p *Parser) peekError(t token.TokenType) {
-	msg := fmt.Sprintf("expected next token to be %s, got %s instead.",
-		t, p.peekToken.Type)
+func (p *Parser) pushError(s string, args ...interface{}) {
+	msg := fmt.Sprintf(s, args...)
 	p.errors = append(p.errors, msg)
+}
+
+func (p *Parser) peekError(t token.TokenType) {
+	p.pushError("expected next token to be %s, got %s instead.",
+		t, p.peekToken.Type)
 }
 
 func (p *Parser) nextToken() {
@@ -125,26 +133,35 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.l.NextToken()
 }
 
+// =================
+// Statement parsing
+// =================
+
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
+	prevHasSemicolon := true
 
 	for !p.curTokenIs(token.EOF) {
-		stmt := p.parseStatement()
+		if !prevHasSemicolon {
+			p.pushError("expected a semicolon before the last statement")
+		}
+		stmt, hasSemicolon := p.parseStatement()
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
 		}
 		p.nextToken()
+		prevHasSemicolon = hasSemicolon
 	}
 
 	return program
 }
 
-// =================
-// Statement parsing
-// =================
-
-func (p *Parser) parseStatement() ast.Statement {
+func (p *Parser) parseStatement() (ast.Statement, bool) {
+	// Semicolon rules:
+	// LET, RETURN, SET, and ExpressionStatements _always_ require a
+	// semicolon before the last statement. The last semicolon is
+	// optional.
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
@@ -158,79 +175,69 @@ func (p *Parser) parseStatement() ast.Statement {
 	}
 }
 
-func (p *Parser) parseLetStatement() ast.Statement {
+func (p *Parser) parseLetStatement() (ast.Statement, bool) {
 	stmt := &ast.LetStatement{Token: p.curToken}
 	if !p.expectPeek(token.IDENT) {
-		return nil
+		return nil, true
 	}
-
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	if !p.expectPeek(token.ASSIGN) {
-		return nil
+		return nil, true
 	}
-
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
-	if p.peekTokenIs(token.SEMICOLON) {
-		p.nextToken()
-	}
-
-	return stmt
+	hasSemicolon := p.consumeOptionalSemicolon()
+	return stmt, hasSemicolon
 }
 
-func (p *Parser) parseSetStatement() ast.Statement {
+func (p *Parser) parseSetStatement() (ast.Statement, bool) {
 	// curToken == IDENT, peekToken == ASSIGN
 	stmt := &ast.SetStatement{}
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	p.nextToken()
 	stmt.Token = p.curToken
-
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
-	if p.peekTokenIs(token.SEMICOLON) {
-		p.nextToken()
-	}
-
-	return stmt
+	hasSemicolon := p.consumeOptionalSemicolon()
+	return stmt, hasSemicolon
 }
 
-func (p *Parser) parseReturnStatement() ast.Statement {
+func (p *Parser) parseReturnStatement() (ast.Statement, bool) {
 	stmt := &ast.ReturnStatement{Token: p.curToken}
-
 	p.nextToken()
 	stmt.ReturnValue = p.parseExpression(LOWEST)
-
-	if p.peekTokenIs(token.SEMICOLON) {
-		p.nextToken()
-	}
-
-	return stmt
+	hasSemicolon := p.consumeOptionalSemicolon()
+	return stmt, hasSemicolon
 }
 
-func (p *Parser) parseExpressionStatement() ast.Statement {
+func (p *Parser) parseExpressionStatement() (ast.Statement, bool) {
 	// defer untrace(trace("parseExpressionStatement"))
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 	stmt.Expression = p.parseExpression(LOWEST)
-
-	// Optional semicolon
-	if p.peekTokenIs(token.SEMICOLON) {
-		p.nextToken()
-	}
-
-	return stmt
+	hasSemicolon := p.consumeOptionalSemicolon()
+	return stmt, hasSemicolon
 }
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	block := &ast.BlockStatement{Token: p.curToken}
 	block.Statements = []ast.Statement{}
+	prevHasSemicolon := true
 
 	p.nextToken()
-	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
-		stmt := p.parseStatement()
+	for !p.curTokenIs(token.RBRACE) {
+		if !prevHasSemicolon {
+			p.pushError("expected a semicolon before the last statement")
+		}
+		stmt, hasSemicolon := p.parseStatement()
 		if stmt != nil {
 			block.Statements = append(block.Statements, stmt)
 		}
 		p.nextToken()
+		prevHasSemicolon = hasSemicolon
+		if p.curTokenIs(token.EOF) {
+			p.pushError("unexpected EOF")
+			return nil
+		}
 	}
 
 	return block
@@ -461,6 +468,15 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 // ================
 // Helper functions
 // ================
+
+func (p *Parser) consumeOptionalSemicolon() bool {
+	// Optional semicolon
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+		return true
+	}
+	return false
+}
 
 func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	list := []ast.Expression{}

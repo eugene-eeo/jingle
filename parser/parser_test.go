@@ -2,9 +2,9 @@ package parser_test
 
 import (
 	"fmt"
-	"monkey/ast"
-	"monkey/lexer"
-	"monkey/parser"
+	"jingle/ast"
+	"jingle/lexer"
+	"jingle/parser"
 	"testing"
 )
 
@@ -32,6 +32,24 @@ func checkParserErrors(t *testing.T, p *parser.Parser) {
 		t.Errorf("parser error: %q", msg)
 	}
 	t.FailNow()
+}
+
+func testParserErrors(t *testing.T, p *parser.Parser, hasErrors bool) bool {
+	// Very different test -- we don't fail when the parser
+	// errors out, we want to inspect the error values.
+	errors := p.Errors()
+	if len(errors) == 0 && hasErrors {
+		t.Errorf("expected to have parser errors, got none")
+		return false
+	}
+	if len(errors) != 0 && !hasErrors {
+		t.Errorf("parser has %d errors", len(errors))
+		for _, msg := range errors {
+			t.Errorf("parser error: %q", msg)
+		}
+		return false
+	}
+	return true
 }
 
 func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) bool {
@@ -961,6 +979,37 @@ func TestParsingHashLiterals(t *testing.T) {
 			t.Errorf("tests[%d]: cannot parse %q correctly",
 				i, tt.input)
 			continue
+		}
+	}
+}
+
+func TestSemicolonRules(t *testing.T) {
+	tests := []struct {
+		input     string
+		hasErrors bool
+	}{
+		// === Let and set statements ===
+		{"let u = 1 false", true},
+		{"u = 2 false", true},
+		// Within a block...
+		{"if (false) { let u = 1 [1,2,3] }", true},
+		{"if (false) { u = 1 [1,2,3] }", true},
+		// === Return statements ===
+		{"return 1 false", true},
+		{"if (false) { return [1,2] 1 }", true},
+		// === ExpressionStatement ===
+		{"if (false) { 2 } 1", true},
+		{"fn (x') { } 1", true},
+		{"1 1", true},
+	}
+
+	for i, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		p.ParseProgram()
+		if !testParserErrors(t, p, tt.hasErrors) {
+			t.Errorf("tests[%d]: expected parsing hasErrors=%t",
+				i, tt.hasErrors)
 		}
 	}
 }

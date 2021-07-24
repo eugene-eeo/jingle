@@ -2,7 +2,7 @@ package lexer
 
 import (
 	"bytes"
-	"monkey/token"
+	"jingle/token"
 )
 
 type Lexer struct {
@@ -38,7 +38,7 @@ func (l *Lexer) peekChar() byte {
 }
 
 func (l *Lexer) skipWhitespace() {
-	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+	for isWhiteSpace(l.ch) {
 		l.readChar()
 	}
 }
@@ -141,7 +141,12 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.EOF
 	default:
 		if isLetter(l.ch) {
-			tok.Literal = l.readIdentifier()
+			id, ok := l.readIdentifier()
+			tok.Literal = id
+			if !ok {
+				tok.Type = token.ILLEGAL
+				return tok
+			}
 			tok.Type = token.LookupIdent(tok.Literal)
 			// return early -- we don't need to do another readChar()
 			// since l.readIdentifier read it for us
@@ -204,12 +209,13 @@ func (l *Lexer) readString() (string, bool) {
 	return buf.String(), true
 }
 
-func (l *Lexer) readIdentifier() string {
-	position := l.position
-	for isLetter(l.ch) {
+func (l *Lexer) readIdentifier() (string, bool) {
+	position := l.position // first pos must be a letter
+	l.readChar()
+	for isLetter(l.ch) || l.ch == '\'' || (l.ch <= '9' && l.ch >= '0') {
 		l.readChar()
 	}
-	return l.input[position:l.position]
+	return l.input[position:l.position], true
 }
 
 func (l *Lexer) readNumber() string {
@@ -226,4 +232,31 @@ func isDigit(ch byte) bool {
 
 func isLetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+}
+
+func isOperator(ch byte) bool {
+	return ch == '=' ||
+		ch == '+' ||
+		ch == '-' ||
+		ch == '*' ||
+		ch == '/' ||
+		ch == ':' ||
+		ch == '|' ||
+		ch == '&' ||
+		ch == '<' ||
+		ch == '>' ||
+		ch == '!' ||
+		ch == ',' ||
+		ch == ';' ||
+		ch == '(' ||
+		ch == ')' ||
+		ch == '{' ||
+		ch == '}' ||
+		ch == '[' ||
+		ch == ']' ||
+		ch == '"'
+}
+
+func isWhiteSpace(ch byte) bool {
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
 }

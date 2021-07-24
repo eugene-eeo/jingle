@@ -1,10 +1,10 @@
 package evaluator_test
 
 import (
-	"monkey/evaluator"
-	"monkey/lexer"
-	"monkey/object"
-	"monkey/parser"
+	"jingle/evaluator"
+	"jingle/lexer"
+	"jingle/object"
+	"jingle/parser"
 	"testing"
 )
 
@@ -190,17 +190,14 @@ func TestScopes(t *testing.T) {
 		input    string
 		expected interface{}
 	}{
-		{"let t = 2; if (true) { t = 1; } t;", 1},
-		{"let t = 2; if (true) { let t = 1; } t;", 2},
-		{"let t = 2; if (true) { t = 1; let t = 3; } t;", 1},
+		{"let t = 2; if (true) { t = 1; }; t;", 1},
+		{"let t = 2; if (true) { let t = 1; }; t;", 2},
+		{"let t = 2; if (true) { t = 1; let t = 3; }; t;", 1},
 		{`
 let f = fn() {
     let u = 1;
-    let g = fn() {
-    	u = 2;
-    	return u;
-    }
-    return g;
+    let g = fn() { u = 2 };
+    g
 };
 let g = f();
 g();
@@ -212,8 +209,8 @@ let f = fn() {
     	let u = 2;
     	let v = 3;
     	u = 1;
-    	return v;
-    }
+    	v
+    };
     return g;
 };
 let g = f();
@@ -238,7 +235,7 @@ func TestReturnStatements(t *testing.T) {
 		{"return 10; 9;", 10},
 		{"2; return 10; 9;", 10},
 		{"2; return 1 * 4; 9;", 4},
-		{"if (10 > 1) { if (10 > 1) { return 10; } return 1; }", 10},
+		{"if (10 > 1) { if (10 > 1) { return 10; }; return 1; }", 10},
 		{"let f = fn() { return 5 }; let a = fn() { f(); return 10; }; a()", 10},
 	}
 
@@ -266,7 +263,7 @@ func TestErrorHandling(t *testing.T) {
 		{"true + false;", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"},
-		{"if (10 > 1) { if (true) { return true + false; } return 1; }", "unknown operator: BOOLEAN + BOOLEAN"},
+		{"if (10 > 1) { if (true) { return true + false; }; return 1; }", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"if (1 + true) { 1 }", "type mismatch: INTEGER + BOOLEAN"},
 		{"(if (1) { return true + false; }) + 2", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"foobar", "identifier not found: foobar"},
@@ -334,11 +331,13 @@ func TestFunctionCall(t *testing.T) {
 	}{
 		{"let a = fn() { return 5; }; a();", 5},
 		{"let a = fn(x) { return x; }; a();", Null{}},
+		// Set and Let will return Null instead of exploding
 		{"let a = fn(x) { x = 1; }; a();", Null{}},
-		{"let a = fn(x, y) { if (x == 1) { return y; } return x }; a(1, 2);", 2},
-		{"let a = fn(x, y) { if (x == 1) { return y; } return x }; a(0, 2);", 0},
+		{"let a = fn(x) { let u = 1; }; a();", Null{}},
+		{"let a = fn(x, y) { if (x == 1) { return y; }; return x }; a(1, 2);", 2},
+		{"let a = fn(x, y) { if (x == 1) { return y; }; return x }; a(0, 2);", 0},
 		{"let u = 1; let a = fn() { return u; }; a();", 1},
-		{"let adder = fn(n) { return fn(x) { n + x } }; let addOne = adder(1); addOne(2);", 3},
+		{"let adder = fn(n) { fn(x) { n + x } }; let addOne = adder(1); addOne(2);", 3},
 		// Cannot modify variables outside of our block scope using =
 		{"let u = 1; let f = fn(n) { u = 3; return n; }; f(2);", Error{"identifier not found: u"}},
 		// Cannot call non-functions
