@@ -645,6 +645,9 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{`[1] is [1]`, `([1] is [1]);`},
 		{`[2] is [1]`, `([2] is [1]);`},
 		{`{} is {}`, `({} is {});`},
+		{`[1,2,3][1][2][3]`, `((([1, 2, 3][1])[2])[3]);`},
+		{`[1,2,3][1][2]`, `(([1, 2, 3][1])[2]);`},
+		{`[1,2,3][1]`, `([1, 2, 3][1]);`},
 	}
 
 	for d, tt := range tests {
@@ -997,10 +1000,15 @@ func TestSemicolonRules(t *testing.T) {
 		// === Return statements ===
 		{"return 1 false", true},
 		{"if (false) { return [1,2] 1 }", true},
-		// === ExpressionStatement ===
+		// === ExpressionStatement (If) ===
 		{"if (false) { 2 } 1", false},
+		// === ExpressionStatement (Function) ===
 		{"fn (x') { } 1", false},
+		// === ExpressionStatement (Others) ===
 		{"1 1", true},
+		{"{} 1", true},
+		{"[] 1", true},
+		{"true 1", true},
 	}
 
 	for i, tt := range tests {
