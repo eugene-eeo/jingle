@@ -211,6 +211,9 @@ func bytes2uint64(b [8]byte) uint64 {
 func (ht *HashTable) rehash(grow bool) {
 	s1 := [8]byte{}
 	s2 := [8]byte{}
+	// it's safe to ignore the length and errors.
+	// the documentation for rand.Read(...) says they will
+	// always read len(b) bytes, and return nil error.
 	rng.Read(s1[:])
 	rng.Read(s2[:])
 	ht.seed1 = bytes2uint64(s1)

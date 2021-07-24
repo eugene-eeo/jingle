@@ -2,7 +2,20 @@ package lexer
 
 import (
 	"bytes"
+	"fmt"
 	"jingle/token"
+	"regexp"
+)
+
+type LexerError struct {
+	error string
+}
+
+func (le LexerError) Error() string { return le.error }
+
+var (
+	identRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*[']*$`)
+	integerRegex = regexp.MustCompile(`^[0-9]+$`)
 )
 
 type Lexer struct {
@@ -50,12 +63,7 @@ func (l *Lexer) NextToken() token.Token {
 
 	switch l.ch {
 	case '"':
-		str, ok := l.readString()
-		tok.Type = token.STRING
-		tok.Literal = str
-		if !ok {
-			tok.Type = token.ILLEGAL
-		}
+		return l.scanString()
 	case '=':
 		if l.peekChar() == '=' {
 			ch := l.ch
@@ -141,19 +149,13 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.EOF
 	default:
 		if isLetter(l.ch) {
-			id, ok := l.readIdentifier()
-			tok.Literal = id
-			if !ok {
-				tok.Type = token.ILLEGAL
-				return tok
+			tok = l.scanAtom(token.IDENT, identRegex)
+			if tok.Type != token.ILLEGAL {
+				tok.Type = token.LookupIdent(tok.Literal)
 			}
-			tok.Type = token.LookupIdent(tok.Literal)
-			// return early -- we don't need to do another readChar()
-			// since l.readIdentifier read it for us
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Literal = l.readNumber()
-			tok.Type = token.INT
+			tok = l.scanAtom(token.INT, integerRegex)
 			return tok
 		} else {
 			tok = newToken(token.ILLEGAL, l.ch)
@@ -168,9 +170,10 @@ func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
 }
 
-func (l *Lexer) readString() (string, bool) {
+func (l *Lexer) scanString() token.Token {
 	escape := false
 	var buf bytes.Buffer
+outer:
 	for {
 		l.readChar() // skip over the " initially
 		if escape {
@@ -188,42 +191,60 @@ func (l *Lexer) readString() (string, bool) {
 			case '"':
 				buf.WriteByte('"')
 			default:
-				return string(l.ch), false
+				break outer
 			}
 			// remember to turn it off!
 			escape = false
-		} else if l.ch == '\\' {
-			escape = true
-		} else if l.ch == 0 {
-			return "EOF", false
-		} else if l.ch == '\r' {
-			return "\\r", false
-		} else if l.ch == '\n' {
-			return "\\n", false
-		} else if l.ch == '"' {
-			break
 		} else {
-			buf.WriteByte(l.ch)
+			switch l.ch {
+			case '\\':
+				escape = true
+			case '"':
+				l.readChar() // consume '"'
+				tok := token.Token{Type: token.STRING}
+				tok.Literal = buf.String()
+				return tok
+			case '\n':
+				break outer
+			case '\r':
+				break outer
+			case 0:
+				break outer
+			default:
+				buf.WriteByte(l.ch)
+			}
 		}
 	}
-	return buf.String(), true
-}
-
-func (l *Lexer) readIdentifier() (string, bool) {
-	position := l.position // first pos must be a letter
-	l.readChar()
-	for isLetter(l.ch) || l.ch == '\'' || (l.ch <= '9' && l.ch >= '0') {
+	tok := token.Token{Type: token.ILLEGAL}
+	tok.Literal = fmt.Sprintf("invalid character: %q", l.ch)
+	for l.ch != 0 && l.ch != '"' {
+		// try to consume until the next "
 		l.readChar()
 	}
-	return l.input[position:l.position], true
+	l.readChar() // consume the "
+	return tok
 }
 
-func (l *Lexer) readNumber() string {
+func (l *Lexer) scanAtom(
+	tokenType token.TokenType,
+	re *regexp.Regexp,
+) token.Token {
 	position := l.position
-	for isDigit(l.ch) {
+	for !isOperator(l.ch) && !isWhiteSpace(l.ch) && l.ch != 0 {
 		l.readChar()
 	}
-	return l.input[position:l.position]
+	tok := token.Token{}
+	str := l.input[position:l.position]
+	if indexes := re.FindIndex([]byte(str)); indexes == nil ||
+		indexes[0] != 0 ||
+		indexes[1] != len(str) {
+		tok.Type = token.ILLEGAL
+		tok.Literal = fmt.Sprintf("invalid %s: %q", tokenType, str)
+		return tok
+	}
+	tok.Type = tokenType
+	tok.Literal = str
+	return tok
 }
 
 func isDigit(ch byte) bool {

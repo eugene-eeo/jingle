@@ -38,10 +38,7 @@ a <= b;
 10 is 10;
 `
 
-	tests := []struct {
-		expectedType    token.TokenType
-		expectedLiteral string
-	}{
+	tests := []Token{
 		{token.LET, "let"},
 		{token.IDENT, "five"},
 		{token.ASSIGN, "="},
@@ -161,87 +158,107 @@ a <= b;
 	l := lexer.New(input)
 	for i, tt := range tests {
 		tok := l.NextToken()
-		if tok.Type != tt.expectedType {
-			t.Fatalf("tests[%d]: tokentype wrong. expected=%q, got=%q",
-				i, tt.expectedType, tok.Type)
-			// t.Fatalf("tests[%d]: %T(%+v)", i, tok, tok)
-		}
-		if tok.Literal != tt.expectedLiteral {
-			t.Fatalf("tests[%d]: literal wrong. expected=%q, got=%q",
-				i, tt.expectedLiteral, tok.Literal)
+		if !testToken(t, tok, tt) {
+			t.Fatalf("tests[%d]: failed", i)
+			return
 		}
 	}
 }
 
 func TestLexIdentifier(t *testing.T) {
-	type testToken struct {
-		_type token.TokenType
-		lit   string
-	}
 	tests := []struct {
-		input  string
-		tokens []testToken
+		input     string
+		testToken Token
 	}{
-		{"a", []testToken{{token.IDENT, "a"}}},
-		{"a1", []testToken{{token.IDENT, "a1"}}},
-		{"_1", []testToken{{token.IDENT, "_1"}}},
-		{"f'", []testToken{{token.IDENT, "f'"}}},
-		{"'f", []testToken{{token.ILLEGAL, "'"}, {token.IDENT, "f"}}},
+		{"a", Token{token.IDENT, "a"}},
+		{"a1", Token{token.IDENT, "a1"}},
+		{"_1", Token{token.IDENT, "_1"}},
+		{"f'", Token{token.IDENT, "f'"}},
+		{"f'a", Token{token.ILLEGAL, "invalid IDENT: \"f'a\""}},
 	}
 	for i, test := range tests {
-		l := lexer.New(test.input)
-		for j, tt := range test.tokens {
-			tok := l.NextToken()
-			if tok.Type != tt._type {
-				t.Fatalf("tests[%d][%d]: tokentype wrong. expected=%q, got=%q",
-					i, j, tt._type, tok.Type)
-			}
-			if tok.Literal != tt.lit {
-				t.Fatalf("tests[%d]: literal wrong. expected=%q, got=%q",
-					i, tt.lit, tok.Literal)
-			}
+		if !testOneToken(t, test.input, test.testToken) {
+			t.Errorf("tests[%d]: failed", i)
 		}
-		tok := l.NextToken()
-		if tok.Type != token.EOF {
-			t.Fatalf("tests[%d]: tokentype wrong. expected=%q, got=%q",
-				i, token.EOF, tok.Type)
+	}
+}
+
+func TestLexNumber(t *testing.T) {
+	tests := []struct {
+		input     string
+		testToken Token
+	}{
+		{"1", Token{token.INT, "1"}},
+		{"1a", Token{token.ILLEGAL, nil}},
+		{"1b", Token{token.ILLEGAL, nil}},
+		{"100", Token{token.INT, "100"}},
+		{"1239421", Token{token.INT, "1239421"}},
+	}
+	for i, test := range tests {
+		if !testOneToken(t, test.input, test.testToken) {
+			t.Errorf("tests[%d]: failed", i)
 		}
 	}
 }
 
 func TestLexString(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected interface{}
+		input     string
+		testToken Token
 	}{
-		{`"hello"`, "hello"},
-		{`"hello\""`, `hello"`},
-		{`"hello\t\r\n\0"`, "hello\t\r\n\u0000"},
-		{`"hello\\"`, `hello\`},
-		{"\"hello\n\"", nil},
+		{`"hello"`, Token{token.STRING, "hello"}},
+		{`"hello\""`, Token{token.STRING, `hello"`}},
+		{`"hello\t\r\n\0"`, Token{token.STRING, "hello\t\r\n\u0000"}},
+		{`"hello\\"`, Token{token.STRING, `hello\`}},
+		{"\"hello\n\"", Token{token.ILLEGAL, nil}},
 	}
-
-	for i, tt := range tests {
-		l := lexer.New(tt.input)
-		tok := l.NextToken()
-		if tt.expected == nil {
-			if tok.Type != token.ILLEGAL {
-				t.Errorf("tests[%d]: tok.Type != token.ILLEGAL. got=%q", i, tok.Type)
-				continue
-			}
-		} else {
-			if tok.Type != token.STRING {
-				t.Errorf("tests[%d]: tok.Type != token.STRING. got=%q", i, tok.Type)
-				continue
-			}
-			if tok.Literal != tt.expected.(string) {
-				t.Errorf("tests[%d]: tok.Literal != %q. got=%q", i, tt.expected, tok.Literal)
-			}
-			eof := l.NextToken()
-			if eof.Type != token.EOF {
-				t.Errorf("tests[%d]: eof.Type != token.EOF. got=%q", i, tok.Type)
-				continue
-			}
+	for i, test := range tests {
+		if !testOneToken(t, test.input, test.testToken) {
+			t.Errorf("tests[%d]: failed", i)
 		}
 	}
+}
+
+// =================
+// Testing Utilities
+// =================
+
+type Token struct {
+	expectedType    token.TokenType
+	expectedLiteral interface{}
+}
+
+func testToken(t *testing.T, tok token.Token, test Token) bool {
+	if tok.Type != test.expectedType {
+		t.Errorf("invalid tok.Type. expected=%s, got=%s",
+			test.expectedType, tok.Type)
+		return false
+	}
+	if test.expectedLiteral != nil {
+		if tok.Literal != test.expectedLiteral.(string) {
+			t.Errorf("invalid tok.Literal. expected=%q, got=%q",
+				test.expectedLiteral, tok.Literal)
+			return false
+		}
+	}
+	return true
+}
+
+// testOneToken asserts that the given input produces exactly
+// one token.
+func testOneToken(
+	t *testing.T,
+	input string,
+	test Token,
+) bool {
+	l := lexer.New(input)
+	tok := l.NextToken()
+	if !testToken(t, tok, test) {
+		return false
+	}
+	if tok := l.NextToken(); tok.Type != token.EOF {
+		t.Errorf("expected EOF, got=%T(%#v)", tok, tok)
+		return false
+	}
+	return true
 }
