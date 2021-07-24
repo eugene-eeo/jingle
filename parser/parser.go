@@ -123,6 +123,11 @@ func (p *Parser) Errors() []string {
 
 func (p *Parser) pushError(s string, args ...interface{}) {
 	msg := fmt.Sprintf(s, args...)
+	msg = fmt.Sprintf("%s:%d:%d: %s",
+		p.l.Filename,
+		p.curToken.LineNo,
+		p.curToken.Column,
+		msg)
 	p.errors = append(p.errors, msg)
 }
 
@@ -133,13 +138,20 @@ func (p *Parser) peekError(t token.TokenType) {
 
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
-	p.peekToken = p.l.NextToken()
+	tok, err := p.l.NextToken()
+	if err != nil {
+		p.errors = append(p.errors, err.Error())
+	}
+	p.peekToken = tok
 }
 
 // =================
 // Statement parsing
 // =================
 
+// ParseProgram() returns a *ast.Program representing the program
+// being fed into the parser. This is the main entry point into the
+// parser -- start reading from here!
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
@@ -162,9 +174,9 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 func (p *Parser) parseStatement() (ast.Statement, bool) {
 	// Semicolon rules:
-	// LET, RETURN, and SET _always_ requires a semicolon before the
-	// last statement. Otherwise, if we're in an ExpressionStatement,
-	// then only functions and if statements do not require a semicolon.
+	// LET and RETURN _always_ requires a semicolon before the last
+	// statement. Otherwise, if we're in an ExpressionStatement, then
+	// only functions and if statements do not require a semicolon.
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()

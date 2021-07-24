@@ -33,6 +33,7 @@ func Start(in io.Reader, out io.Writer) {
 
 		line := scanner.Text()
 		l := lexer.New(line)
+		l.Filename = "<stdin>"
 		p := parser.New(l)
 
 		program := p.ParseProgram()

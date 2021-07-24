@@ -3,179 +3,148 @@ package lexer
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"jingle/token"
 	"regexp"
 )
 
-type LexerError struct {
-	error string
-}
+// used when we have nothing to return
+var EmptyToken = token.Token{Type: token.ILLEGAL}
 
-func (le LexerError) Error() string { return le.error }
-
+// atom regexes
 var (
-	identRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*[']*$`)
-	integerRegex = regexp.MustCompile(`^[0-9]+$`)
+	identRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*[']*$`)
+	intRegex   = regexp.MustCompile(`^[0-9]+$`)
 )
 
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 type Lexer struct {
-	input        string
-	position     int  // current position in input (points to current char)
-	readPosition int  // current reading position in input (after current char)
-	ch           byte // current char under examination. byte == input[position]
+	Filename string
+	input    *peekRuneReader
+	// where are we in the file?
+	position     int  // l.ch == l.input[position]
+	readPosition int  // 1 after position
+	ch           rune // current rune under examination
+	// update this as we read the characters.
+	column int
+	lineNo int
 }
 
-func New(input string) *Lexer {
-	l := &Lexer{input: input}
-	l.readChar()
-	return l
+func New(s string) *Lexer {
+	lexer := &Lexer{}
+	lexer.input = newPeekRuneReader(bytes.NewReader([]byte(s)))
+	lexer.Filename = ""
+	lexer.init()
+	return lexer
 }
 
-func (l *Lexer) readChar() {
-	if l.readPosition >= len(l.input) {
-		// EOF ==> set ch to NUL.
+func (l *Lexer) init() {
+	if l.lineNo != 0 {
+		panic("init() called twice")
+	}
+	l.lineNo = 1
+	must(l.advance())
+}
+
+func (l *Lexer) advance() error {
+	r, _, err := l.input.ReadRune()
+	if err == io.EOF {
 		l.ch = 0
-	} else {
-		l.ch = l.input[l.readPosition]
+		l.column++
+		return nil
 	}
-	l.position = l.readPosition
-	l.readPosition += 1
+	if err != nil {
+		return l.wrapError(err)
+	}
+	l.ch = r
+	if l.ch == '\n' {
+		l.lineNo++
+		l.column = 0
+	} else {
+		l.column++
+	}
+	return nil
 }
 
-func (l *Lexer) peekChar() byte {
-	if l.readPosition >= len(l.input) {
-		return 0
-	} else {
-		return l.input[l.readPosition]
-	}
-}
+// -----------------------------
+// The meat of the code is here!
+// -----------------------------
 
-func (l *Lexer) skipWhitespace() {
+func (l *Lexer) NextToken() (token.Token, error) {
+	tok := EmptyToken
+
+	// Skip over whitespace
 	for isWhiteSpace(l.ch) {
-		l.readChar()
+		if err := l.advance(); err != nil {
+			return EmptyToken, err
+		}
 	}
-}
 
-func (l *Lexer) NextToken() token.Token {
-	var tok token.Token
+	// try to scan an operator
+	// first two char operators...
+	r1, r2 := l.ch, l.peek()
+	rp := runePair{r1, r2}
+	if tokenType, ok := twoCharOps[rp]; ok {
+		tok = l.emitStringToken(tokenType, string(r1)+string(r2))
+		if err := l.advance(); err != nil {
+			return tok, err
+		}
+		goto end
+	}
+	// now one char operators...
+	if tokenType, ok := oneCharOps[r1]; ok {
+		tok = l.emitRuneToken(tokenType, r1)
+		goto end
+	}
 
-	l.skipWhitespace()
-
-	switch l.ch {
-	case '"':
+	// try to scan a 'simple' literal (int, string, bool, null)
+	switch {
+	case l.ch == '"':
 		return l.scanString()
-	case '=':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = token.Token{Type: token.EQ, Literal: literal}
-		} else {
-			tok = newToken(token.ASSIGN, l.ch)
+	case isLetter(l.ch):
+		tok, err := l.scanAtom(token.IDENT, identRegex)
+		if err == nil {
+			tok.Type = token.LookupIdent(tok.Literal)
 		}
-	case ':':
-		tok = newToken(token.COLON, l.ch)
-	case '+':
-		tok = newToken(token.PLUS, l.ch)
-	case '-':
-		tok = newToken(token.MINUS, l.ch)
-	case '!':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = token.Token{Type: token.NOT_EQ, Literal: literal}
-		} else {
-			tok = newToken(token.BANG, l.ch)
-		}
-	case '|':
-		if l.peekChar() == '|' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = token.Token{Type: token.OR, Literal: literal}
-		} else {
-			tok = newToken(token.ILLEGAL, l.ch)
-		}
-	case '&':
-		if l.peekChar() == '&' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = token.Token{Type: token.AND, Literal: literal}
-		} else {
-			tok = newToken(token.ILLEGAL, l.ch)
-		}
-	case '/':
-		tok = newToken(token.SLASH, l.ch)
-	case '*':
-		tok = newToken(token.ASTERISK, l.ch)
-	case '<':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = token.Token{Type: token.LEQ, Literal: literal}
-		} else {
-			tok = newToken(token.LT, l.ch)
-		}
-	case '>':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			literal := string(ch) + string(l.ch)
-			tok = token.Token{Type: token.GEQ, Literal: literal}
-		} else {
-			tok = newToken(token.GT, l.ch)
-		}
-	case ';':
-		tok = newToken(token.SEMICOLON, l.ch)
-	case ',':
-		tok = newToken(token.COMMA, l.ch)
-	case '(':
-		tok = newToken(token.LPAREN, l.ch)
-	case ')':
-		tok = newToken(token.RPAREN, l.ch)
-	case '{':
-		tok = newToken(token.LBRACE, l.ch)
-	case '}':
-		tok = newToken(token.RBRACE, l.ch)
-	case '[':
-		tok = newToken(token.LBRACKET, l.ch)
-	case ']':
-		tok = newToken(token.RBRACKET, l.ch)
-	case 0:
-		tok.Literal = ""
-		tok.Type = token.EOF
-	default:
-		if isLetter(l.ch) {
-			tok = l.scanAtom(token.IDENT, identRegex)
-			if tok.Type != token.ILLEGAL {
-				tok.Type = token.LookupIdent(tok.Literal)
-			}
-			return tok
-		} else if isDigit(l.ch) {
-			tok = l.scanAtom(token.INT, integerRegex)
-			return tok
-		} else {
-			tok = newToken(token.ILLEGAL, l.ch)
-		}
+		return tok, err
+	case isDigit(l.ch):
+		return l.scanAtom(token.INT, intRegex)
 	}
 
-	l.readChar()
-	return tok
+end:
+	// Still empty??
+	if tok == EmptyToken {
+		// need to put this here to prevent the advance()
+		// from ruining our debug messages
+		return EmptyToken,
+			l.makeError("unhandled character: %q", l.ch)
+	}
+	if err := l.advance(); err != nil {
+		return EmptyToken, err
+	}
+	return tok, nil
 }
 
-func newToken(tokenType token.TokenType, ch byte) token.Token {
-	return token.Token{Type: tokenType, Literal: string(ch)}
-}
+// ========
+// Utils...
+// ========
 
-func (l *Lexer) scanString() token.Token {
+func (l *Lexer) scanString() (token.Token, error) {
 	escape := false
 	var buf bytes.Buffer
+	startingColumn := l.column
+	startingLineNo := l.lineNo
 outer:
 	for {
-		l.readChar() // skip over the " initially
+		// skip over the " initially
+		if err := l.advance(); err != nil {
+			return EmptyToken, err
+		}
 		if escape {
 			switch l.ch {
 			case '\\':
@@ -200,10 +169,16 @@ outer:
 			case '\\':
 				escape = true
 			case '"':
-				l.readChar() // consume '"'
-				tok := token.Token{Type: token.STRING}
-				tok.Literal = buf.String()
-				return tok
+				err := l.advance() // consume '"'
+				if err != nil {
+					return EmptyToken, err
+				}
+				return token.Token{
+					Type:    token.STRING,
+					Literal: buf.String(),
+					LineNo:  startingLineNo,
+					Column:  startingColumn,
+				}, nil
 			case '\n':
 				break outer
 			case '\r':
@@ -211,73 +186,61 @@ outer:
 			case 0:
 				break outer
 			default:
-				buf.WriteByte(l.ch)
+				buf.WriteRune(l.ch)
 			}
 		}
 	}
-	tok := token.Token{Type: token.ILLEGAL}
-	tok.Literal = fmt.Sprintf("invalid character: %q", l.ch)
+	err := l.makeError("invalid char in string literal: %q", string(l.ch))
 	for l.ch != 0 && l.ch != '"' {
 		// try to consume until the next "
-		l.readChar()
+		if err := l.advance(); err != nil {
+			return EmptyToken, err
+		}
 	}
-	l.readChar() // consume the "
-	return tok
+	// consume the "
+	if err := l.advance(); err != nil {
+		return EmptyToken, err
+	}
+	return EmptyToken, err
 }
 
 func (l *Lexer) scanAtom(
-	tokenType token.TokenType,
+	t token.TokenType,
 	re *regexp.Regexp,
-) token.Token {
-	position := l.position
-	for !isOperator(l.ch) && !isWhiteSpace(l.ch) && l.ch != 0 {
-		l.readChar()
+) (token.Token, error) {
+	// save these, because we will ruin them in a second.
+	startingLineNo := l.lineNo
+	startingColumn := l.column
+	// begin scanning!
+	var buf bytes.Buffer
+	for l.ch != 0 && !isPunctuation(l.ch) && !isWhiteSpace(l.ch) {
+		buf.WriteRune(l.ch)
+		err := l.advance()
+		if err != nil {
+			return EmptyToken, err
+		}
 	}
-	tok := token.Token{}
-	str := l.input[position:l.position]
-	if indexes := re.FindIndex([]byte(str)); indexes == nil ||
-		indexes[0] != 0 ||
-		indexes[1] != len(str) {
-		tok.Type = token.ILLEGAL
-		tok.Literal = fmt.Sprintf("invalid %s: %q", tokenType, str)
-		return tok
+	// try to match the atom
+	str := buf.String()
+	if !re.MatchString(str) {
+		err := newErrorFromLexer(l)
+		err.message = fmt.Sprintf("invalid %s: %q", t, str)
+		err.LineNo = startingLineNo
+		err.Column = startingColumn
+		return EmptyToken, err
 	}
-	tok.Type = tokenType
-	tok.Literal = str
-	return tok
+	return token.Token{
+		Type:    t,
+		Literal: str,
+		LineNo:  startingLineNo,
+		Column:  startingColumn,
+	}, nil
 }
 
-func isDigit(ch byte) bool {
-	return '0' <= ch && ch <= '9'
-}
-
-func isLetter(ch byte) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
-}
-
-func isOperator(ch byte) bool {
-	return ch == '=' ||
-		ch == '+' ||
-		ch == '-' ||
-		ch == '*' ||
-		ch == '/' ||
-		ch == ':' ||
-		ch == '|' ||
-		ch == '&' ||
-		ch == '<' ||
-		ch == '>' ||
-		ch == '!' ||
-		ch == ',' ||
-		ch == ';' ||
-		ch == '(' ||
-		ch == ')' ||
-		ch == '{' ||
-		ch == '}' ||
-		ch == '[' ||
-		ch == ']' ||
-		ch == '"'
-}
-
-func isWhiteSpace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+func (l *Lexer) peek() rune {
+	p, err := l.input.Peek()
+	if err == io.EOF {
+		return 0
+	}
+	return p
 }

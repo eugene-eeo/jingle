@@ -1,4 +1,4 @@
-package lexer2
+package lexer
 
 import "io"
 

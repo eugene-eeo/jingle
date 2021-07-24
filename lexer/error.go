@@ -1,4 +1,4 @@
-package lexer2
+package lexer
 
 import "fmt"
 
@@ -15,7 +15,7 @@ type LexerError struct {
 
 func newErrorFromLexer(l *Lexer) LexerError {
 	return LexerError{
-		Filename: l.filename,
+		Filename: l.Filename,
 		LineNo:   l.lineNo,
 		Column:   l.column,
 	}
