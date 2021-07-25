@@ -1,0 +1,4 @@
+todo:
+ - change String to be []rune based
+ - more types more problems: clean up evaluator
+ - user-defined objects
