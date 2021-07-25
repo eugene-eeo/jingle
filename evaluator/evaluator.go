@@ -44,18 +44,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 	// ==== Expressions ====
 	case *ast.SetExpression:
-		switch left := node.Left.(type) {
-		case *ast.Identifier:
-			if !env.Has(left.Value) {
-				return newError("identifier not found: %s", left.Value)
-			}
-			value := Eval(node.Right, env)
-			if isError(value) {
-				return value
-			}
-			env.Set(left.Value, value)
-			return NULL
-		}
+		return evalSetExpression(node, env)
 	case *ast.PrefixExpression:
 		right := Eval(node.Right, env)
 		if isError(right) {
@@ -130,6 +119,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.HashLiteral:
 		return evalHashLiteral(node, env)
 
+	// 'Native' types
 	case *ast.StringLiteral:
 		return &object.String{Value: node.Value}
 	case *ast.IntegerLiteral:
@@ -221,6 +211,42 @@ func evalIfExpression(node *ast.IfExpression, env *object.Environment) object.Ob
 	} else {
 		return NULL
 	}
+}
+
+func evalSetExpression(
+	node *ast.SetExpression,
+	env *object.Environment,
+) object.Object {
+	switch left := node.Left.(type) {
+	case *ast.IndexExpression:
+		// Left[Index]
+		assignee := Eval(left.Left, env)
+		if isError(assignee) {
+			return assignee
+		}
+		index := Eval(left.Index, env)
+		if isError(index) {
+			return index
+		}
+		value := Eval(node.Right, env)
+		if isError(value) {
+			return value
+		}
+		return evalSetIndex(assignee, index, value)
+	case *ast.Identifier:
+		// assigning to identifiers is easy
+		if !env.Has(left.Value) {
+			return newError("identifier not found: %s", left.Value)
+		}
+		value := Eval(node.Right, env)
+		if isError(value) {
+			return value
+		}
+		env.Set(left.Value, value)
+	default:
+		return nil
+	}
+	return NULL
 }
 
 // ==========================
@@ -322,124 +348,6 @@ func evalBangOperatorExpression(right object.Object) object.Object {
 	default:
 		return FALSE
 	}
-}
-
-func evalInfixExpression(operator string, left, right object.Object) object.Object {
-	switch {
-	case operator == "is":
-		// Pointer equality
-		return nativeBoolToBooleanObject(left == right)
-	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
-		return evalIntegerInfixExpression(
-			operator,
-			left.(*object.Integer),
-			right.(*object.Integer),
-		)
-	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
-		return evalStringInfixExpression(
-			operator,
-			left.(*object.String),
-			right.(*object.String),
-		)
-	case operator == "==":
-		return nativeBoolToBooleanObject(left == right)
-	case operator == "!=":
-		return nativeBoolToBooleanObject(left != right)
-	case left.Type() != right.Type():
-		return newError("type mismatch: %s %s %s",
-			left.Type(), operator, right.Type())
-	}
-	return newError("unknown operator: %s %s %s",
-		left.Type(), operator, right.Type())
-}
-
-func evalIntegerInfixExpression(operator string, left, right *object.Integer) object.Object {
-	a := left.Value
-	b := right.Value
-	switch operator {
-	case "+":
-		return &object.Integer{Value: a + b}
-	case "-":
-		return &object.Integer{Value: a - b}
-	case "/":
-		return &object.Integer{Value: a / b}
-	case "*":
-		return &object.Integer{Value: a * b}
-	case "==":
-		return nativeBoolToBooleanObject(a == b)
-	case "!=":
-		return nativeBoolToBooleanObject(a != b)
-	case "<":
-		return nativeBoolToBooleanObject(a < b)
-	case ">":
-		return nativeBoolToBooleanObject(a > b)
-	case "<=":
-		return nativeBoolToBooleanObject(a <= b)
-	case ">=":
-		return nativeBoolToBooleanObject(a >= b)
-	default:
-		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
-	}
-}
-
-func evalStringInfixExpression(operator string, left, right *object.String) object.Object {
-	a := left.Value
-	b := right.Value
-	switch operator {
-	case "+":
-		return &object.String{Value: a + b}
-	// case "*":
-	// 	return &object.Integer{Value: a * b}
-	case "==":
-		return nativeBoolToBooleanObject(a == b)
-	case "!=":
-		return nativeBoolToBooleanObject(a != b)
-	case "<":
-		return nativeBoolToBooleanObject(a < b)
-	case ">":
-		return nativeBoolToBooleanObject(a > b)
-	case "<=":
-		return nativeBoolToBooleanObject(a <= b)
-	case ">=":
-		return nativeBoolToBooleanObject(a >= b)
-	default:
-		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
-	}
-}
-
-func evalIndexExpression(left, index object.Object) object.Object {
-	switch {
-	case left.Type() == object.ARRAY_OBJ && index.Type() == object.INTEGER_OBJ:
-		return evalArrayIndexExpression(
-			left.(*object.Array),
-			index.(*object.Integer),
-		)
-	case left.Type() == object.HASH_OBJ:
-		return evalHashIndexExpression(left.(*object.Hash), index)
-	default:
-		return newError("operator not supported: %s[%s]", left.Type(), index.Type())
-	}
-}
-
-func evalArrayIndexExpression(array *object.Array, index *object.Integer) object.Object {
-	idx := index.Value
-	max := int64(len(array.Elements)) - 1
-	if idx < 0 || idx > max {
-		return NULL
-	}
-	return array.Elements[idx]
-}
-
-func evalHashIndexExpression(hash *object.Hash, key object.Object) object.Object {
-	hashKey, ok := key.(object.Hashable)
-	if !ok {
-		return newError("unusable as hash key: %s", key.Type())
-	}
-	value, ok := hash.Pairs.Get(hashKey)
-	if !ok {
-		return NULL
-	}
-	return value
 }
 
 func evalHashLiteral(node *ast.HashLiteral, env *object.Environment) object.Object {

@@ -258,8 +258,9 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 // ============================
 
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {
-	msg := fmt.Sprintf("no prefix parse function for %s found", t)
-	p.errors = append(p.errors, msg)
+	p.pushError("no prefix parse function for %s found", t)
+	// msg := fmt.Sprintf()
+	// p.errors = append(p.errors, msg)
 }
 
 func (p *Parser) parseExpression(precedence int) ast.Expression {
@@ -397,35 +398,30 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 }
 
 func (p *Parser) parseFunctionParameters() []*ast.Identifier {
-	identifiers := []*ast.Identifier{}
-	if p.peekTokenIs(token.RPAREN) {
-		p.nextToken()
-		return identifiers
-	}
-
+	idents := []*ast.Identifier{}
 	p.nextToken()
-	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	identifiers = append(identifiers, ident)
-
-	for p.peekTokenIs(token.COMMA) {
-		p.nextToken() // skip the comma
-		if p.peekTokenIs(token.RPAREN) {
-			// this conditional allows for trailing commas,
-			// see parseExpressionList
-			break
+	for {
+		if p.curTokenIs(token.RPAREN) {
+			return idents
 		}
-		if !p.expectPeek(token.IDENT) {
+		if !p.curTokenIs(token.IDENT) {
+			p.pushError("expected IDENT, got=%s", p.curToken.Type)
 			return nil
 		}
-		// p.nextToken() // now we're on top of the ident
+		// current Token is an IDENT
 		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-		identifiers = append(identifiers, ident)
+		idents = append(idents, ident)
+		if p.peekTokenIs(token.COMMA) {
+			p.nextToken()
+			p.nextToken()
+			continue
+		}
+		// terminate here
+		if !p.expectPeek(token.RPAREN) {
+			return nil
+		}
+		return idents
 	}
-
-	if !p.expectPeek(token.RPAREN) {
-		return nil
-	}
-	return identifiers
 }
 
 func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {

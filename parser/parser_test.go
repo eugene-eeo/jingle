@@ -485,7 +485,11 @@ func TestBadSetExpressions(t *testing.T) {
 		{"x = 5", false, "x", 5},
 		{"x = y", false, "x", "y"},
 		{"x = null", false, "x", Null{}},
-		{"x[1] = 1", true, nil, nil},
+		{"x[1] = 1", false,
+			ExprTestFunc(func(node ast.Expression) bool {
+				return testIndexExpression(t, node, "x", 1)
+			}),
+			1},
 		{"[1,2,3] = 1", true, nil, nil},
 		{"{1:2} = 1", true, nil, nil},
 		{`"a" = 1`, true, nil, nil},
@@ -744,6 +748,7 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{`[1,2,3][1][2][3]`, `((([1, 2, 3][1])[2])[3]);`},
 		{`[1,2,3][1][2]`, `(([1, 2, 3][1])[2]);`},
 		{`[1,2,3][1]`, `([1, 2, 3][1]);`},
+		{`{}[1][2][3] = 4`, `((({}[1])[2])[3]) = 4;`},
 	}
 
 	for d, tt := range tests {
@@ -1004,6 +1009,7 @@ func TestParsingArrayLiterals(t *testing.T) {
 		value Array
 	}{
 		{"[]", Array{}},
+		{"[1,]", Array{1}},
 		{"[1,2]", Array{1, 2}},
 		{"[1,2,]", Array{1, 2}},
 		{"[a,1,true,null,\"abc\"]", Array{"a", 1, true, Null{}, String{"abc"}}},
@@ -1056,6 +1062,7 @@ func TestParsingHashLiterals(t *testing.T) {
 		hash  interface{}
 	}{
 		{"{}", Hash{}},
+		{"{1: 2}", Hash{{1, 2}}},
 		{"{1: 2,}", Hash{{1, 2}}},
 		{"{1: 2, 2: 3}", Hash{{1, 2}, {2, 3}}},
 		{"{1: 2, 2: 3,}", Hash{{1, 2}, {2, 3}}},
@@ -1105,6 +1112,46 @@ func TestSemicolonRules(t *testing.T) {
 		{"{} 1", true},
 		{"[] 1", true},
 		{"true 1", true},
+	}
+
+	for i, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		p.ParseProgram()
+		if !testParserErrors(t, p, tt.hasErrors) {
+			t.Errorf("tests[%d]: expected parsing hasErrors=%t",
+				i, tt.hasErrors)
+		}
+	}
+}
+
+func TestParseCommaSeparated(t *testing.T) {
+	tests := []struct {
+		input     string
+		hasErrors bool
+	}{
+		{"[]", false},
+		{"[,]", true},
+		{"[1,]", false},
+		{"[1,,]", true},
+		{"[1,2,]", false},
+		{"[1,,2,]", true},
+		{"[1,2,,]", true},
+		{"{}", false},
+		{"{,}", true},
+		{"{1:1,2}", true},
+		{"{1:1,2:2}", false},
+		{"{1:1,2:2,}", false},
+		{"{1:1,2:2,,}", true},
+		{"{1:1,,2:2,}", true},
+		{"fn() {}", false},
+		{"fn(,) {}", true},
+		{"fn(x) {}", false},
+		{"fn(x,) {}", false},
+		{"fn(x,y) {}", false},
+		{"fn(x,y,) {}", false},
+		{"fn(x,y,,) {}", true},
+		{"fn(x,,y,) {}", true},
 	}
 
 	for i, tt := range tests {

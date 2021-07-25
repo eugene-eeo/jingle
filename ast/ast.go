@@ -291,6 +291,7 @@ type IndexExpression struct {
 }
 
 func (ie *IndexExpression) expressionNode()      {}
+func (ie *IndexExpression) assignableNode()      {}
 func (ie *IndexExpression) TokenLiteral() string { return ie.Token.Literal }
 func (ie *IndexExpression) String() string {
 	var out bytes.Buffer

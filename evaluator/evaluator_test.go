@@ -252,22 +252,22 @@ func TestErrorHandling(t *testing.T) {
 		input        string
 		errorMessage string
 	}{
-		{"5 + true;", "type mismatch: INTEGER + BOOLEAN"},
-		{"5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"},
-		{"(5 + true) + 5;", "type mismatch: INTEGER + BOOLEAN"},
+		{"5 + true;", "unknown operator: INTEGER + BOOLEAN"},
+		{"5 + true; 5;", "unknown operator: INTEGER + BOOLEAN"},
+		{"(5 + true) + 5;", "unknown operator: INTEGER + BOOLEAN"},
 		{"-true;", "unknown operator: -BOOLEAN"},
 		{"true + false;", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"if (10 > 1) { if (true) { return true + false; }; return 1; }", "unknown operator: BOOLEAN + BOOLEAN"},
-		{"if (1 + true) { 1 }", "type mismatch: INTEGER + BOOLEAN"},
+		{"if (1 + true) { 1 }", "unknown operator: INTEGER + BOOLEAN"},
 		{"(if (1) { return true + false; }) + 2", "unknown operator: BOOLEAN + BOOLEAN"},
 		{"foobar", "identifier not found: foobar"},
 		{"let foobar = 1; x = 1", "identifier not found: x"},
 		{`"a" - "b"`, "unknown operator: STRING - STRING"},
-		{"let a = 5 + true;", "type mismatch: INTEGER + BOOLEAN"},
+		{"let a = 5 + true;", "unknown operator: INTEGER + BOOLEAN"},
 		{"let a = 5; a = u + 1;", "identifier not found: u"},
-		{"!(true + 5)", "type mismatch: BOOLEAN + INTEGER"},
+		{"!(true + 5)", "unknown operator: BOOLEAN + INTEGER"},
 		{"u(1)", "identifier not found: u"},
 		{"let f = fn() {}; f(z)", "identifier not found: z"},
 		{"u[1]", "identifier not found: u"},
@@ -358,6 +358,8 @@ func TestBuiltinFunctions(t *testing.T) {
 		{`len("one", "two")`, Error{}},
 		{`len(["a"])`, 1},
 		{`len([1,2,3])`, 3},
+		{`len({1:2})`, 1},
+		{`len({1:2, 3:4})`, 2},
 
 		// Meta stuff
 		{`type(1)`, String{"INTEGER"}},
@@ -369,41 +371,6 @@ func TestBuiltinFunctions(t *testing.T) {
 		{`hashable(1)`, true},
 		{`hashable(1, 2)`, Error{}},
 		{`hashable(fn() {})`, true},
-
-		// Arrays
-		{`copy()`, Error{}},
-		{`copy(1)`, Error{}},
-		{`copy(["a"], 2)`, Error{}},
-		{`copy(["a", 1, null])`, Array{String{"a"}, 1, Null{}}},
-
-		{`push("a", 1)`, Error{}},
-		{`push(["a"])`, Error{}},
-		{`push(["a"], "b")`, Array{String{"a"}, String{"b"}}},
-		{`push(["a"], "b", 2)`, Array{String{"a"}, String{"b"}, 2}},
-		{`push([], "b", 2, null)`, Array{String{"b"}, 2, Null{}}},
-
-		{`delete([], 1, 2)`, Error{}},
-		{`delete("abc", 1)`, Error{}},
-		{`delete([], "a")`, Error{}},
-		{`delete(["a", "b", 2, 3, 4], 1)`, Array{String{"a"}, 2, 3, 4}},
-		{`delete([0, 1, 2, 3], 0)`, Array{1, 2, 3}},
-		{`delete([0, 1, 2, 3], 1)`, Array{0, 2, 3}},
-		{`delete([0, 1, 2, 3], 1 + 1)`, Array{0, 1, 3}},
-		{`delete([0, 1, 2, 3], 3)`, Array{0, 1, 2}},
-		{`delete([0, 1, 2, 3], -1)`, Error{}},
-		{`delete([0, 1, 2, 3], 100)`, Error{}},
-
-		{`insert([], 0)`, Error{}},
-		{`insert("a", "a", {})`, Error{}},
-		{`insert([], "a", {})`, Error{}},
-		{`insert([], 1, "a")`, Error{}},
-		{`insert([], 0, "b")`, Array{String{"b"}}},
-		{`insert([1], 0, "b")`, Array{String{"b"}, 1}},
-		{`insert([1, 2], 1, "b")`, Array{1, String{"b"}, 2}},
-		{`insert([1, 2], 2, "b")`, Array{1, 2, String{"b"}}},
-
-		// Hash tables
-		{`copy({"a": 1})`, Hash{{String{"a"}, 1}}},
 	}
 	for i, tt := range tests {
 		evaluated := testEval(t, tt.input)
@@ -433,6 +400,7 @@ func TestIndexExpressions(t *testing.T) {
 let f = fn() {};
 let h = {f: 1};
 h[f]`, 1},
+		{`"a"[0]`, String{"a"}},
 	}
 	for i, tt := range tests {
 		evaluated := testEval(t, tt.input)
@@ -490,6 +458,27 @@ func TestShortCircuit(t *testing.T) {
 		program := p.ParseProgram()
 		checkParserErrors(t, p)
 		if !testObject(t, evaluator.Eval(program, env), tt.expected) {
+			t.Errorf("tests[%d]: failed", i)
+		}
+	}
+}
+
+func TestSetExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		{"let x = 1; x = 2", Null{}},
+		{"let x = 1; if (true) { x = 2 } else { 5 }", Null{}},
+		{"(fn(){ let x = null; x = 3 })()", Null{}},
+		{"(fn(){ let x = null; return (x = 3) })()", Null{}},
+		{"let x = [1]; x[0] = 2; x[0]", 2},
+		{"let x = [[0], [1, 2], [3, 4, 5]]; x[0][0] = 1; x[0]", Array{1}},
+		{"let x = {1: 2}; x[1] = 1; x[1]", 1},
+	}
+	for i, tt := range tests {
+		obj := testEval(t, tt.input)
+		if !testObject(t, obj, tt.expected) {
 			t.Errorf("tests[%d]: failed", i)
 		}
 	}
