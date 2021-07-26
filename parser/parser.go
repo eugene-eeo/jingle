@@ -460,7 +460,7 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 		}
 		p.nextToken()
 		val := p.parseExpression(LOWEST)
-		hash.Pairs = append(hash.Pairs, ast.HashPair{key, val})
+		hash.Pairs = append(hash.Pairs, ast.HashPair{Key: key, Value: val})
 		if p.peekTokenIs(token.COMMA) {
 			p.nextToken()
 			p.nextToken()
