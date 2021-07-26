@@ -42,9 +42,10 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		env.Let(node.Name.Value, value)
 		return nil
 
+	case *ast.SetStatement:
+		return evalSetStatement(node, env)
+
 	// ==== Expressions ====
-	case *ast.SetExpression:
-		return evalSetExpression(node, env)
 	case *ast.PrefixExpression:
 		right := Eval(node.Right, env)
 		if isError(right) {
@@ -213,8 +214,8 @@ func evalIfExpression(node *ast.IfExpression, env *object.Environment) object.Ob
 	}
 }
 
-func evalSetExpression(
-	node *ast.SetExpression,
+func evalSetStatement(
+	node *ast.SetStatement,
 	env *object.Environment,
 ) object.Object {
 	switch left := node.Left.(type) {

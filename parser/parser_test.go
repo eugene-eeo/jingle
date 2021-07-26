@@ -189,26 +189,26 @@ func testHashLiteral(t *testing.T, exp ast.Expression, value Hash) bool {
 	return true
 }
 
-func testSetExpression(
+func testSetStatement(
 	t *testing.T,
-	expr ast.Expression,
+	node ast.Statement,
 	left interface{},
 	right interface{},
 ) bool {
-	setExpr, ok := expr.(*ast.SetExpression)
+	setStmt, ok := node.(*ast.SetStatement)
 	if !ok {
-		t.Errorf("expr not *ast.SetExpression. got=%T(%+v)", expr, expr)
+		t.Errorf("node not *ast.SetExpression. got=%T(%+v)", node, node)
 		return false
 	}
-	if setExpr.TokenLiteral() != "=" {
+	if setStmt.TokenLiteral() != "=" {
 		t.Errorf("setExpr.TokenLiteral() not %q. got=%q",
-			"=", setExpr.TokenLiteral())
+			"=", setStmt.TokenLiteral())
 		return false
 	}
-	if !testLiteralExpression(t, setExpr.Left, left) {
+	if !testLiteralExpression(t, setStmt.Left, left) {
 		return false
 	}
-	if !testLiteralExpression(t, setExpr.Right, right) {
+	if !testLiteralExpression(t, setStmt.Right, right) {
 		return false
 	}
 	return true
@@ -475,7 +475,7 @@ func TestLetStatements(t *testing.T) {
 	}
 }
 
-func TestBadSetExpressions(t *testing.T) {
+func TestSetStatements(t *testing.T) {
 	tests := []struct {
 		input     string
 		hasErrors bool
@@ -508,6 +508,7 @@ func TestBadSetExpressions(t *testing.T) {
 		if !testParserErrors(t, p, tt.hasErrors) {
 			t.Errorf("tests[%d]: expected parsing hasErrors=%t",
 				i, tt.hasErrors)
+			continue
 		}
 		if tt.hasErrors {
 			continue
@@ -516,8 +517,7 @@ func TestBadSetExpressions(t *testing.T) {
 			t.Fatalf("program.Statements does not contain 1 statements. got=%d",
 				len(program.Statements))
 		}
-		expr := program.Statements[0].(*ast.ExpressionStatement)
-		if !testSetExpression(t, expr.Expression, tt.left, tt.right) {
+		if !testSetStatement(t, program.Statements[0], tt.left, tt.right) {
 			t.Fatalf("tests[%d]: failed to parse correctly", i)
 		}
 	}
@@ -751,16 +751,21 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{`{}[1][2][3] = 4`, `((({}[1])[2])[3]) = 4;`},
 	}
 
-	for d, tt := range tests {
+	for i, tt := range tests {
 		l := lexer.New(tt.input)
 		p := parser.New(l)
 		program := p.ParseProgram()
-		checkParserErrors(t, p)
+
+		if !testParserErrors(t, p, false) {
+			t.Errorf("tests[%d]: failed parsing '%q'", i, tt.input)
+			continue
+		}
 
 		actual := program.String()
 		if actual != tt.expected {
-			t.Errorf("tests[%d]: expected=%q, got=%q", d,
+			t.Errorf("tests[%d]: expected=%q, got=%q", i,
 				tt.expected, actual)
+			continue
 		}
 	}
 }
@@ -994,12 +999,12 @@ return a;
 			3, len(program.Statements))
 		return
 	}
-	let := program.Statements[0].(*ast.LetStatement)
-	set := program.Statements[1].(*ast.ExpressionStatement)
-	ret := program.Statements[2].(*ast.ReturnStatement)
+	let := program.Statements[0].(ast.Statement)
+	set := program.Statements[1].(ast.Statement)
+	ret := program.Statements[2].(ast.Statement)
 
 	testLetStatement(t, let, "a", 1)
-	testSetExpression(t, set.Expression, "a", 2)
+	testSetStatement(t, set, "a", 2)
 	testReturnStatement(t, ret, "a")
 }
 

@@ -463,15 +463,15 @@ func TestShortCircuit(t *testing.T) {
 	}
 }
 
-func TestSetExpression(t *testing.T) {
+func TestSetStatement(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected interface{}
 	}{
-		{"let x = 1; x = 2", Null{}},
-		{"let x = 1; if (true) { x = 2 } else { 5 }", Null{}},
+		{"let x = 1; x = 2;", Null{}},
+		{"let x = 1; if (true) { x = 2 } else { 5 };", Null{}},
 		{"(fn(){ let x = null; x = 3 })()", Null{}},
-		{"(fn(){ let x = null; return (x = 3) })()", Null{}},
+		{"(fn(){ let x = 3; return x })()", 3},
 		{"let x = [1]; x[0] = 2; x[0]", 2},
 		{"let x = [[0], [1, 2], [3, 4, 5]]; x[0][0] = 1; x[0]", Array{1}},
 		{"let x = {1: 2}; x[1] = 1; x[1]", 1},

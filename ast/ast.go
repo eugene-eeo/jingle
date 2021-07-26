@@ -84,6 +84,23 @@ func (i *Identifier) assignableNode()      {}
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 func (i *Identifier) String() string       { return i.Value }
 
+type SetStatement struct {
+	Token token.Token // the '=' token
+	Left  Assignable
+	Right Expression
+}
+
+func (se *SetStatement) statementNode()       {}
+func (se *SetStatement) TokenLiteral() string { return se.Token.Literal }
+func (se *SetStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(se.Left.String())
+	out.WriteString(" = ")
+	out.WriteString(se.Right.String())
+	out.WriteString(";")
+	return out.String()
+}
+
 type ReturnStatement struct {
 	Token       token.Token // the token.RETURN token
 	ReturnValue Expression
@@ -139,22 +156,6 @@ func (pe *PrefixExpression) String() string {
 	out.WriteString(pe.Right.String())
 	out.WriteString(")")
 
-	return out.String()
-}
-
-type SetExpression struct {
-	Token token.Token // the '=' token
-	Left  Assignable
-	Right Expression
-}
-
-func (se *SetExpression) expressionNode()      {}
-func (se *SetExpression) TokenLiteral() string { return se.Token.Literal }
-func (se *SetExpression) String() string {
-	var out bytes.Buffer
-	out.WriteString(se.Left.String())
-	out.WriteString(" = ")
-	out.WriteString(se.Right.String())
 	return out.String()
 }
 
