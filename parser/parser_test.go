@@ -23,13 +23,13 @@ func TestParseLiterals(t *testing.T) {
 		program, err := p.Parse()
 		if err != nil {
 			t.Errorf("test[%d] failed", i)
-			t.Fatalf("cannot parse: %q", tt.input)
+			t.Fatalf("cannot parse: %q, got err=%s", tt.input, err)
 		}
 		if len(program.Nodes) != 1 {
-			t.Fatalf("expected len(program.Nodes)=1, got=%d", len(program.Nodes))
+			t.Fatalf("test[%d] expected len(program.Nodes)=1, got=%d", len(program.Nodes), i)
 		}
 		if !ut.TestNode(t, program.Nodes[0], tt.expected) {
-			t.Fatalf("failed")
+			t.Fatalf("test[%d] failed", i)
 		}
 	}
 }
@@ -49,13 +49,14 @@ func TestParseLetStatements(t *testing.T) {
 		program, err := p.Parse()
 		if err != nil {
 			t.Errorf("test[%d] failed", i)
-			t.Fatalf("cannot parse: %q", tt.input)
+			t.Fatalf("cannot parse: %q, got err=%s", tt.input, err)
 		}
 		if len(program.Nodes) != 1 {
-			t.Fatalf("expected len(program.Nodes)=1, got=%d", len(program.Nodes))
+			t.Fatalf("test[%d] expected len(program.Nodes)=1, got=%d", len(program.Nodes), i)
 		}
 		if !ut.TestLetStatement(t, program.Nodes[0], tt.left, tt.right) {
-			t.Fatalf("failed")
+			t.Logf("%+v", program.Nodes[0])
+			t.Fatalf("test[%d] failed", i)
 		}
 	}
 }

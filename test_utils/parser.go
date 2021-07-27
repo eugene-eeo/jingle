@@ -104,6 +104,11 @@ func testLiteralToken(t *testing.T, node ast.Node, tokenType token.TokenType) bo
 }
 
 func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool {
+	if node.Type() != ast.LET_STATEMENT {
+		t.Errorf("invalid node.Type(). expected=%s, got=%s",
+			ast.NodeTypeAsString(node.Type()),
+			ast.NodeTypeAsString(ast.LET_STATEMENT))
+	}
 	letStmt := node.(*ast.LetStatement)
 	return TestNode(t, letStmt.Left, left) && TestNode(t, letStmt.Right, right)
 }

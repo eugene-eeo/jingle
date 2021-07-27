@@ -6,11 +6,9 @@
 package parser
 
 import (
-	"fmt"
 	"jingle/ast"
 	"jingle/lexer"
 	"jingle/token"
-	"strconv"
 )
 
 var EmptyToken = token.Token{Type: token.ILLEGAL}
@@ -22,14 +20,17 @@ type Parser struct {
 	// precedences
 	prefixHandlers map[token.TokenType]prefixParseFn
 	infixHandlers  map[token.TokenType]infixParseFn
+	precedence     map[token.TokenType]int
 }
 
 func New(lx *lexer.Lexer) *Parser {
-	return &Parser{
+	p := &Parser{
 		lexer:  lx,
 		tokens: []token.Token{},
 		read:   0,
 	}
+	p.initExpressions()
+	return p
 }
 
 func (p *Parser) MustParse() *ast.Program {
@@ -41,23 +42,20 @@ func (p *Parser) MustParse() *ast.Program {
 }
 
 // Program is the main entry point into the parser.
-func (p *Parser) Parse() (*ast.Program, error) {
+func (p *Parser) Parse() (program *ast.Program, err error) {
 	// Internally, we use panic(...) but this method will wrap
 	// these panics into an error for the public API.
-	var program *ast.Program = nil
-	var rvError error = nil
 	defer func() {
 		if r := recover(); r != nil {
-			if err, ok := r.(ParserError); ok {
-				program = nil
-				rvError = err
+			if pe, ok := r.(ParserError); ok {
+				err = pe
 				return
 			}
 			panic(r)
 		}
 	}()
 	program = p.parseProgram()
-	return program, rvError
+	return
 }
 
 // ===============
@@ -73,26 +71,23 @@ func (p *Parser) lookAhead(distance int) token.Token {
 	// [t1 t2 t3 t4]
 	//     ^read
 	// lookAhead(1) => no reads
-	for distance >= len(p.tokens)-p.read {
+	size := len(p.tokens)
+	for distance >= size-p.read {
 		tok, err := p.lexer.NextToken()
 		if err != nil {
 			p.errorErr(err)
 		}
 		p.tokens = append(p.tokens, tok)
+		size++
 	}
 	return p.tokens[p.read+distance]
 }
 
 func (p *Parser) expect(t token.TokenType) token.Token {
-	tok := p.consume()
-	if tok.Type != t {
-		panic(ParserError{
-			Filename: p.lexer.Filename,
-			Msg:      fmt.Sprintf("expected %s, got %s instead", t, tok.Type),
-			Token:    &tok,
-		})
+	if tokType := p.current().Type; tokType != t {
+		p.errorToken("expected %s, got %s instead", t, tokType)
 	}
-	return tok
+	return p.consume()
 }
 
 func (p *Parser) consume() token.Token {
@@ -156,60 +151,24 @@ func (p *Parser) parseProgram() *ast.Program {
 	return prog
 }
 
-// --- This is the entry into our Pratt parser ---
-func (p *Parser) parseExpression() ast.Node {
-	switch {
-	case p.lookAheadMatches(token.IDENT):
-		return p.parseIdentifier()
-	case p.lookAheadMatches(token.NULL):
-		return p.parseNullLiteral()
-	case p.lookAheadMatches(token.NUMBER):
-		return p.parseNumberLiteral()
-	case p.lookAheadMatches(token.STRING):
-		return p.parseStringLiteral()
-	}
-	panic(fmt.Sprintf("unhandled token: %+v", p.current()))
-}
-
-func (p *Parser) parseIdentifier() *ast.IdentifierLiteral {
-	return &ast.IdentifierLiteral{Token: p.expect(token.IDENT)}
-}
-
-func (p *Parser) parseNullLiteral() *ast.NullLiteral {
-	return &ast.NullLiteral{Token: p.expect(token.NULL)}
-}
-
-func (p *Parser) parseNumberLiteral() *ast.NumberLiteral {
-	tok := p.expect(token.NUMBER)
-	val, err := strconv.ParseFloat(tok.Literal, 64)
-	if err != nil {
-		p.errorToken("invalid number: %e", err)
-	}
-	return &ast.NumberLiteral{Token: tok, Value: val}
-}
-
-func (p *Parser) parseStringLiteral() *ast.StringLiteral {
-	tok := p.expect(token.STRING)
-	return &ast.StringLiteral{Token: tok, Value: tok.Literal}
-}
-
 func (p *Parser) parseStatement() ast.Node {
 	switch {
-	case p.lookAheadMatches(token.LET):
+	case p.match(token.LET):
 		return p.parseLetStatement()
 	}
 	return p.parseExpression()
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
-	letToken := p.expect(token.LET)
-	left := p.parseIdentifier()
+	letToken := p.current()
+	p.expect(token.IDENT)
+	left := p.parseIdentifierLiteral()
 	p.expect(token.ASSIGN)
 	right := p.parseExpression()
 	return &ast.LetStatement{
 		StartToken: letToken,
-		EndToken:   p.last(1),
-		Left:       left,
+		EndToken:   right.End(),
+		Left:       left.(*ast.IdentifierLiteral),
 		Right:      right,
 	}
 }

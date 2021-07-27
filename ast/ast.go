@@ -54,8 +54,10 @@ type LetStatement struct {
 	Right      Node
 }
 
-func (node *LetStatement) statementNode()     {}
-func (node *LetStatement) Type() NodeType     { return PROGRAM }
+func (node *LetStatement) statementNode() {}
+func (node *LetStatement) Type() NodeType { return LET_STATEMENT }
+
+// func (node *LetStatement) Type() NodeType     { return LET_STATEMENT }
 func (node *LetStatement) Start() token.Token { return node.StartToken }
 func (node *LetStatement) End() token.Token   { return node.EndToken }
 func (node *LetStatement) String() string {
