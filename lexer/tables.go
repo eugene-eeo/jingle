@@ -18,6 +18,8 @@ var twoCharOps = map[runePair]token.TokenType{}
 
 func init() {
 	allOperators := []operator{
+		{"\u0000", token.EOF},
+		{";", token.SEMICOLON},
 		{"=", token.ASSIGN},
 		{"+", token.PLUS},
 		{"-", token.MINUS},
@@ -34,14 +36,12 @@ func init() {
 		{"==", token.EQ},
 		{"!=", token.NOT_EQ},
 		{",", token.COMMA},
-		{";", token.SEMICOLON},
 		{"(", token.LPAREN},
 		{")", token.RPAREN},
 		{"{", token.LBRACE},
 		{"}", token.RBRACE},
 		{"[", token.LBRACKET},
 		{"]", token.RBRACKET},
-		{"\u0000", token.EOF},
 	}
 	for _, op := range allOperators {
 		if len(op.ch) == 1 {

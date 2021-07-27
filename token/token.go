@@ -3,19 +3,22 @@ package token
 type TokenType string
 
 type Token struct {
-	Type    TokenType
+	Type TokenType
+	// TODO: make Literal a []rune to save memory
 	Literal string // The contents of the token (what was consumed)
 	LineNo  int
 	Column  int
 }
 
 const (
-	ILLEGAL = "ILLEGAL"
-	EOF     = "EOF"
+	ILLEGAL   = "ILLEGAL"
+	EOF       = "EOF"
+	SEP       = "SEP" // _separators_, i.e. '[\r\n]+'
+	SEMICOLON = ";"
 
 	// Identifiers + literals
 	IDENT  = "IDENT"
-	INT    = "INT"
+	NUMBER = "NUMBER"
 	STRING = "STRING"
 
 	// Operators
@@ -39,9 +42,7 @@ const (
 	NOT_EQ = "!="
 
 	// Delimiters
-	COMMA     = ","
-	SEMICOLON = ";"
-
+	COMMA    = ","
 	LPAREN   = "("
 	RPAREN   = ")"
 	LBRACE   = "{"
@@ -58,7 +59,7 @@ const (
 	ELSE     = "ELSE"
 	RETURN   = "RETURN"
 	NULL     = "NULL"
-	IS       = "is"
+	END      = "END"
 )
 
 var keywords = map[string]TokenType{
@@ -70,7 +71,7 @@ var keywords = map[string]TokenType{
 	"true":   TRUE,
 	"false":  FALSE,
 	"null":   NULL,
-	"is":     IS,
+	"end":    END,
 }
 
 func LookupIdent(ident string) TokenType {

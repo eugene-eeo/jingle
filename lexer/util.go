@@ -27,7 +27,7 @@ func (l *Lexer) emitStringToken(
 }
 
 func isPunctuation(ch rune) bool {
-	return false ||
+	return false || // aesthetic
 		ch == '=' || ch == '+' || ch == '-' || ch == '!' || ch == '*' || ch == '/' || ch == ':' ||
 		ch == '|' || ch == '&' ||
 		ch == '<' || ch == '>' ||
@@ -36,8 +36,12 @@ func isPunctuation(ch rune) bool {
 		ch == ')' || ch == '}' || ch == ']'
 }
 
+func isSeparator(ch rune) bool {
+	return ch == '\r' || ch == '\n'
+}
+
 func isWhiteSpace(ch rune) bool {
-	return ch == '\t' || ch == '\n' || ch == ' ' || ch == '\r'
+	return ch == '\t' || ch == ' '
 }
 
 func isDigit(ch rune) bool {

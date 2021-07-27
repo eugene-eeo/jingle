@@ -1,0 +1,215 @@
+// package parser implements a parser for the jingle language.
+// the goals are for it to be easily extensible (so that it is
+// easy to add new syntax elements). The parser is a recursive
+// descent parser with arbitrary lookahead, and is lifted from
+// the magpie language (https://github.com/munificent/magpie).
+package parser
+
+import (
+	"fmt"
+	"jingle/ast"
+	"jingle/lexer"
+	"jingle/token"
+	"strconv"
+)
+
+var EmptyToken = token.Token{Type: token.ILLEGAL}
+
+type Parser struct {
+	lexer  *lexer.Lexer
+	tokens []token.Token // list of tokens we've read so far.
+	read   int           // number of tokens read
+	// precedences
+	prefixHandlers map[token.TokenType]prefixParseFn
+	infixHandlers  map[token.TokenType]infixParseFn
+}
+
+func New(lx *lexer.Lexer) *Parser {
+	return &Parser{
+		lexer:  lx,
+		tokens: []token.Token{},
+		read:   0,
+	}
+}
+
+func (p *Parser) MustParse() *ast.Program {
+	prog, err := p.Parse()
+	if err != nil {
+		panic(err)
+	}
+	return prog
+}
+
+// Program is the main entry point into the parser.
+func (p *Parser) Parse() (*ast.Program, error) {
+	// Internally, we use panic(...) but this method will wrap
+	// these panics into an error for the public API.
+	var program *ast.Program = nil
+	var rvError error = nil
+	defer func() {
+		if r := recover(); r != nil {
+			if err, ok := r.(ParserError); ok {
+				program = nil
+				rvError = err
+				return
+			}
+			panic(r)
+		}
+	}()
+	program = p.parseProgram()
+	return program, rvError
+}
+
+// ===============
+// Utility methods
+// ===============
+func (p *Parser) last(i int) token.Token { return p.tokens[p.read-i] }
+func (p *Parser) current() token.Token   { return p.lookAhead(0) }
+
+func (p *Parser) lookAhead(distance int) token.Token {
+	// [t1 ]
+	//     ^read=1
+	// lookAhead(0) => read 1
+	// [t1 t2 t3 t4]
+	//     ^read
+	// lookAhead(1) => no reads
+	for distance >= len(p.tokens)-p.read {
+		tok, err := p.lexer.NextToken()
+		if err != nil {
+			p.errorErr(err)
+		}
+		p.tokens = append(p.tokens, tok)
+	}
+	return p.tokens[p.read+distance]
+}
+
+func (p *Parser) expect(t token.TokenType) token.Token {
+	tok := p.consume()
+	if tok.Type != t {
+		panic(ParserError{
+			Filename: p.lexer.Filename,
+			Msg:      fmt.Sprintf("expected %s, got %s instead", t, tok.Type),
+			Token:    &tok,
+		})
+	}
+	return tok
+}
+
+func (p *Parser) consume() token.Token {
+	p.lookAhead(0)
+	p.read++
+	return p.last(1)
+}
+
+// isLookAhead looks ahead at the token stream, and returns
+// true if the lookahead stream matches the given types.
+func (p *Parser) lookAheadMatches(types ...token.TokenType) bool {
+	for i, tokenType := range types {
+		if p.lookAhead(i).Type != tokenType {
+			return false
+		}
+	}
+	return true
+}
+
+// match looks ahead at the token stream, and consumes
+// tokens if all of them match the given types.
+func (p *Parser) match(types ...token.TokenType) bool {
+	if !p.lookAheadMatches(types...) {
+		return false
+	}
+	// consume them
+	for i := 0; i < len(types); i++ {
+		p.consume()
+	}
+	return true
+}
+
+// matchAny consumes 1 token if it is _any_ of the given types.
+func (p *Parser) matchAny(types ...token.TokenType) bool {
+	curType := p.current().Type
+	for _, tokType := range types {
+		if curType == tokType {
+			p.consume()
+			return true
+		}
+	}
+	return false
+}
+
+// ===============
+// Actual Parsing!
+// ===============
+
+func (p *Parser) parseProgram() *ast.Program {
+	prog := &ast.Program{StartToken: p.current()}
+	prog.Nodes = []ast.Node{}
+	p.match(token.SEP) // initial whitespace -- ignore
+	hasSep := true
+	for !p.match(token.EOF) {
+		if !hasSep {
+			p.errorToken("expected a newline or semicolon before next statement")
+		}
+		prog.Nodes = append(prog.Nodes, p.parseStatement())
+		hasSep = p.matchAny(token.SEP, token.SEMICOLON)
+	}
+	return prog
+}
+
+// --- This is the entry into our Pratt parser ---
+func (p *Parser) parseExpression() ast.Node {
+	switch {
+	case p.lookAheadMatches(token.IDENT):
+		return p.parseIdentifier()
+	case p.lookAheadMatches(token.NULL):
+		return p.parseNullLiteral()
+	case p.lookAheadMatches(token.NUMBER):
+		return p.parseNumberLiteral()
+	case p.lookAheadMatches(token.STRING):
+		return p.parseStringLiteral()
+	}
+	panic(fmt.Sprintf("unhandled token: %+v", p.current()))
+}
+
+func (p *Parser) parseIdentifier() *ast.IdentifierLiteral {
+	return &ast.IdentifierLiteral{Token: p.expect(token.IDENT)}
+}
+
+func (p *Parser) parseNullLiteral() *ast.NullLiteral {
+	return &ast.NullLiteral{Token: p.expect(token.NULL)}
+}
+
+func (p *Parser) parseNumberLiteral() *ast.NumberLiteral {
+	tok := p.expect(token.NUMBER)
+	val, err := strconv.ParseFloat(tok.Literal, 64)
+	if err != nil {
+		p.errorToken("invalid number: %e", err)
+	}
+	return &ast.NumberLiteral{Token: tok, Value: val}
+}
+
+func (p *Parser) parseStringLiteral() *ast.StringLiteral {
+	tok := p.expect(token.STRING)
+	return &ast.StringLiteral{Token: tok, Value: tok.Literal}
+}
+
+func (p *Parser) parseStatement() ast.Node {
+	switch {
+	case p.lookAheadMatches(token.LET):
+		return p.parseLetStatement()
+	}
+	return p.parseExpression()
+}
+
+func (p *Parser) parseLetStatement() *ast.LetStatement {
+	letToken := p.expect(token.LET)
+	left := p.parseIdentifier()
+	p.expect(token.ASSIGN)
+	right := p.parseExpression()
+	return &ast.LetStatement{
+		StartToken: letToken,
+		EndToken:   p.last(1),
+		Left:       left,
+		Right:      right,
+	}
+}

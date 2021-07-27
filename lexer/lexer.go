@@ -13,8 +13,8 @@ var EmptyToken = token.Token{Type: token.ILLEGAL}
 
 // atom regexes
 var (
-	identRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*[']*$`)
-	intRegex   = regexp.MustCompile(`^[0-9]+$`)
+	identRegex  = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*[']*$`)
+	numberRegex = regexp.MustCompile(`^[0-9]+(\.[0-9]*)?$`)
 )
 
 func must(err error) {
@@ -33,6 +33,7 @@ type Lexer struct {
 	// update this as we read the characters.
 	column int
 	lineNo int
+	eof    *token.Token
 }
 
 func New(s string) *Lexer {
@@ -52,21 +53,28 @@ func (l *Lexer) init() {
 }
 
 func (l *Lexer) advance() error {
-	r, _, err := l.input.ReadRune()
-	if err == io.EOF {
-		l.ch = 0
-		l.column++
+	// check if we've seen an EOF token, so we don't keep reading.
+	if l.eof != nil {
 		return nil
 	}
-	if err != nil {
+	r, _, err := l.input.ReadRune()
+	if err != nil && err != io.EOF {
 		return l.wrapError(err)
 	}
-	l.ch = r
+	if err == io.EOF {
+		r = 0
+	}
 	if l.ch == '\n' {
+		// if the previous ch was a newline, then advance lineNo
 		l.lineNo++
 		l.column = 0
-	} else {
-		l.column++
+	}
+	l.ch = r
+	l.column++
+	if l.ch == 0 {
+		// to get the correct EOF token numbers -_-
+		eofToken := l.emitRuneToken(token.EOF, 0)
+		l.eof = &eofToken
 	}
 	return nil
 }
@@ -77,12 +85,20 @@ func (l *Lexer) advance() error {
 
 func (l *Lexer) NextToken() (token.Token, error) {
 	tok := EmptyToken
+	if l.ch == 0 {
+		return *l.eof, nil
+	}
 
 	// Skip over whitespace
 	for isWhiteSpace(l.ch) {
 		if err := l.advance(); err != nil {
 			return EmptyToken, err
 		}
+	}
+
+	// Greedily match as many separators as possible
+	if isSeparator(l.ch) {
+		return l.scanSeparators()
 	}
 
 	// try to scan an operator
@@ -113,7 +129,7 @@ func (l *Lexer) NextToken() (token.Token, error) {
 		}
 		return tok, err
 	case isDigit(l.ch):
-		return l.scanAtom(token.INT, intRegex)
+		return l.scanAtom(token.NUMBER, numberRegex)
 	}
 
 end:
@@ -122,7 +138,7 @@ end:
 		// need to put this here to prevent the advance()
 		// from ruining our debug messages
 		return EmptyToken,
-			l.makeError("unhandled character: %q", l.ch)
+			l.makeError("unhandled character: %U %q", l.ch, l.ch)
 	}
 	if err := l.advance(); err != nil {
 		return EmptyToken, err
@@ -133,6 +149,21 @@ end:
 // ========
 // Utils...
 // ========
+
+func (l *Lexer) scanSeparators() (token.Token, error) {
+	var buf bytes.Buffer
+	tok := token.Token{Type: token.SEP, LineNo: l.lineNo, Column: l.column}
+	for l.ch != 0 && isSeparator(l.ch) {
+		// consume one, and then continue eating separators
+		buf.WriteRune(l.ch)
+		err := l.advance()
+		if err != nil {
+			return EmptyToken, err
+		}
+	}
+	tok.Literal = buf.String()
+	return tok, nil
+}
 
 func (l *Lexer) scanString() (token.Token, error) {
 	escape := false
@@ -213,7 +244,7 @@ func (l *Lexer) scanAtom(
 	startingColumn := l.column
 	// begin scanning!
 	var buf bytes.Buffer
-	for l.ch != 0 && !isPunctuation(l.ch) && !isWhiteSpace(l.ch) {
+	for l.ch != 0 && !isPunctuation(l.ch) && !isWhiteSpace(l.ch) && !isSeparator(l.ch) {
 		buf.WriteRune(l.ch)
 		err := l.advance()
 		if err != nil {
