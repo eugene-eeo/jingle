@@ -29,6 +29,7 @@ const (
 	ASTERISK = "*"
 	SLASH    = "/"
 	COLON    = ":"
+	DOT      = "."
 
 	OR  = "||"
 	AND = "&&"

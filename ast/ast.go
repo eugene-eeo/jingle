@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"jingle/token"
+	"strings"
 )
 
 // Node is a generic AST node. Furthermore a node can also be a
@@ -134,27 +135,60 @@ func (node *AndExpression) String() string {
 	return out.String()
 }
 
+type BlockExpression struct {
+	Nodes []Node
+}
+
+func (node BlockExpression) Type() NodeType { return BLOCK_EXPRESSION }
+func (node BlockExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString(" ")
+	for _, stmt := range node.Nodes {
+		out.WriteString(stmt.String())
+		out.WriteString("; ")
+	}
+	out.WriteString("end")
+	return out.String()
+}
+
+type AttrExpression struct {
+	Token token.Token // the '.' token
+	Left  Node
+	Right *IdentifierLiteral
+}
+
+func (node AttrExpression) Type() NodeType { return ATTR_EXPRESSION }
+func (node AttrExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(node.Left.String())
+	out.WriteString(")")
+	out.WriteString(node.Token.Literal)
+	out.WriteString(node.Right.String())
+	return out.String()
+}
+
 // ===========================
 // Literals
 // ===========================
 
 type NullLiteral struct {
-	Token token.Token
+	Token token.Token // the 'null' token
 }
 
 func (node *NullLiteral) Type() NodeType { return NULL_LITERAL }
-func (node *NullLiteral) String() string { return "null" }
+func (node *NullLiteral) String() string { return node.Token.Literal }
 
-type BoolLiteral struct {
-	Token token.Token
+type BooleanLiteral struct {
+	Token token.Token // true/false token
 	Value bool
 }
 
-func (node *BoolLiteral) Type() NodeType { return BOOL_LITERAL }
-func (node *BoolLiteral) String() string { return "null" }
+func (node *BooleanLiteral) Type() NodeType { return BOOL_LITERAL }
+func (node *BooleanLiteral) String() string { return node.Token.Literal }
 
 type IdentifierLiteral struct {
-	Token token.Token
+	Token token.Token // ident token
 }
 
 func (node *IdentifierLiteral) Type() NodeType { return IDENTIFIER_LITERAL }
@@ -164,7 +198,7 @@ func (node *IdentifierLiteral) Name() string {
 }
 
 type NumberLiteral struct {
-	Token token.Token
+	Token token.Token // number token
 	Value float64
 }
 
@@ -172,9 +206,31 @@ func (node *NumberLiteral) Type() NodeType { return NUMBER_LITERAL }
 func (node *NumberLiteral) String() string { return node.Token.Literal }
 
 type StringLiteral struct {
-	Token token.Token
+	Token token.Token // string token
 	Value string
 }
 
 func (node *StringLiteral) Type() NodeType { return STRING_LITERAL }
 func (node *StringLiteral) String() string { return fmt.Sprintf("%q", node.Value) }
+
+type FunctionLiteral struct {
+	Token  token.Token // the 'fn' token
+	Params []*IdentifierLiteral
+	Body   *BlockExpression
+}
+
+func (node *FunctionLiteral) Type() NodeType { return FUNCTION_LITERAL }
+func (node *FunctionLiteral) String() string {
+	var buf bytes.Buffer
+	params := []string{}
+	for _, param := range node.Params {
+		params = append(params, param.String())
+	}
+
+	buf.WriteString(node.Token.Literal)
+	buf.WriteString("(")
+	buf.WriteString(strings.Join(params, ", "))
+	buf.WriteString(")")
+	buf.WriteString(node.Body.String())
+	return buf.String()
+}

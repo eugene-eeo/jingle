@@ -43,7 +43,7 @@ func (p *Parser) errorStr(s string, args ...interface{}) {
 }
 
 func (p *Parser) errorToken(s string, args ...interface{}) {
-	tok := p.current()
+	tok := p.last(1)
 	panic(ParserError{
 		Filename: p.lexer.Filename,
 		Token:    &tok,

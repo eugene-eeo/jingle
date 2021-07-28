@@ -13,6 +13,8 @@ const (
 	ASSIGNMENT_EXPRESSION
 	OR_EXPRESSION
 	AND_EXPRESSION
+	BLOCK_EXPRESSION
+	ATTR_EXPRESSION
 
 	// Literals
 	NULL_LITERAL
@@ -20,6 +22,7 @@ const (
 	IDENTIFIER_LITERAL
 	NUMBER_LITERAL
 	STRING_LITERAL
+	FUNCTION_LITERAL
 )
 
 func NodeTypeAsString(t NodeType) string {
@@ -36,6 +39,10 @@ func NodeTypeAsString(t NodeType) string {
 		return "OR_EXPRESSION"
 	case AND_EXPRESSION:
 		return "AND_EXPRESSION"
+	case BLOCK_EXPRESSION:
+		return "BLOCK_EXPRESSION"
+	case ATTR_EXPRESSION:
+		return "ATTR_EXPRESSION"
 	case NULL_LITERAL:
 		return "NULL_LITERAL"
 	case BOOL_LITERAL:
@@ -46,6 +53,8 @@ func NodeTypeAsString(t NodeType) string {
 		return "NUMBER_LITERAL"
 	case STRING_LITERAL:
 		return "STRING_LITERAL"
+	case FUNCTION_LITERAL:
+		return "FUNCTION_LITERAL"
 	}
 	return "<Unknown>"
 }

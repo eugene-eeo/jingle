@@ -86,6 +86,7 @@ func (p *Parser) lookAhead(distance int) token.Token {
 
 func (p *Parser) expect(t token.TokenType) token.Token {
 	if tokType := p.current().Type; tokType != t {
+		p.consume()
 		p.errorToken("expected %s, got %s instead", t, tokType)
 	}
 	return p.consume()
@@ -144,7 +145,7 @@ func (p *Parser) parseProgram() *ast.Program {
 	hasSep := true
 	for !p.match(token.EOF) {
 		if !hasSep {
-			p.errorToken("expected a newline or semicolon before next statement")
+			p.errorToken("expected a newline or semicolon")
 		}
 		prog.Nodes = append(prog.Nodes, p.parseStatement())
 		hasSep = p.matchAny(token.SEP, token.SEMICOLON)

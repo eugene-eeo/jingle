@@ -16,6 +16,11 @@ var (
 	identRegex  = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*[']*$`)
 	numberRegex = regexp.MustCompile(`^[0-9]+(\.[0-9]*)?$`)
 )
+// atom allowedchars
+var (
+	identAllowed = func(ch rune) bool { return isPunctuation(ch) }
+	numberAllowed = func(ch rune) bool { return ch != '.' && isPunctuation(ch) }
+)
 
 type Lexer struct {
 	Filename string
@@ -124,13 +129,13 @@ func (l *Lexer) NextToken() (token.Token, error) {
 	case l.ch == '"':
 		return l.scanString()
 	case isLetter(l.ch):
-		tok, err := l.scanAtom(token.IDENT, identRegex)
+		tok, err := l.scanAtom(token.IDENT, identRegex, identAllowed)
 		if err == nil {
 			tok.Type = token.LookupIdent(tok.Literal)
 		}
 		return tok, err
 	case isDigit(l.ch):
-		return l.scanAtom(token.NUMBER, numberRegex)
+		return l.scanAtom(token.NUMBER, numberRegex, numberAllowed)
 	}
 
 end:
@@ -239,13 +244,14 @@ outer:
 func (l *Lexer) scanAtom(
 	t token.TokenType,
 	re *regexp.Regexp,
+	notAllowed func(rune) bool,
 ) (token.Token, error) {
 	// save these, because we will ruin them in a second.
 	startingLineNo := l.lineNo
 	startingColumn := l.column
 	// begin scanning!
 	var buf bytes.Buffer
-	for l.ch != 0 && !isPunctuation(l.ch) && !isWhiteSpace(l.ch) && !isSeparator(l.ch) {
+	for !(l.ch == 0 || isWhiteSpace(l.ch) || isSeparator(l.ch)) && !notAllowed(l.ch) {
 		buf.WriteRune(l.ch)
 		err := l.advance()
 		if err != nil {

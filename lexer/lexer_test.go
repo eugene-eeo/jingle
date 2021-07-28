@@ -20,6 +20,7 @@ end
 3 && 1000
 "hello" || (!-3)
 3.14159265
+foo.bar != git
 `)
 	testTokens := []Token{
 		{token.SEP, "\n", 1, 1},
@@ -69,10 +70,16 @@ end
 		{token.SEP, "\n", 11, 17},
 		{token.NUMBER, "3.14159265", 12, 1},
 		{token.SEP, "\n", 12, 11},
-		{token.EOF, "\u0000", 13, 1},
-		{token.EOF, "\u0000", 13, 1},
-		{token.EOF, "\u0000", 13, 1},
-		{token.EOF, "\u0000", 13, 1},
+		{token.IDENT, "foo", 13, 1},
+		{token.DOT, ".", 13, 4},
+		{token.IDENT, "bar", 13, 5},
+		{token.NOT_EQ, "!=", 13, 9},
+		{token.IDENT, "git", 13, 12},
+		{token.SEP, "\n", 13, 15},
+		{token.EOF, "\u0000", 14, 1},
+		{token.EOF, "\u0000", 14, 1},
+		{token.EOF, "\u0000", 14, 1},
+		{token.EOF, "\u0000", 14, 1},
 	}
 	for i, test := range testTokens {
 		tok, err := l.NextToken()

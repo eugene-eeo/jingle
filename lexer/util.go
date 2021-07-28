@@ -28,7 +28,7 @@ func (l *Lexer) emitStringToken(
 
 func isPunctuation(ch rune) bool {
 	return false || // aesthetic
-		ch == '=' || ch == '+' || ch == '-' || ch == '!' || ch == '*' || ch == '/' || ch == ':' ||
+		ch == '=' || ch == '+' || ch == '-' || ch == '!' || ch == '*' || ch == '/' || ch == ':' || ch == '.' ||
 		ch == '|' || ch == '&' ||
 		ch == '<' || ch == '>' ||
 		ch == ',' || ch == ';' ||
