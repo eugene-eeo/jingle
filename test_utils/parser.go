@@ -36,6 +36,9 @@ func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool
 		return false
 	}
 	letStmt := node.(*ast.LetStatement)
+	if !testTokenType(t, letStmt.Token, token.LET) {
+		return false
+	}
 	return TestNode(t, letStmt.Left, left) && TestNode(t, letStmt.Right, right)
 }
 
@@ -53,6 +56,28 @@ func TestInfixExpression(t *testing.T, node ast.Node, left interface{}, op strin
 		return false
 	}
 	return TestNode(t, infixExpr.Left, left) && TestNode(t, infixExpr.Right, right)
+}
+
+func TestOrExpression(t *testing.T, node ast.Node, left interface{}, right interface{}) bool {
+	if !TestNodeType(t, node, ast.OR_EXPRESSION) {
+		return false
+	}
+	expr := node.(*ast.OrExpression)
+	if !testTokenType(t, expr.Token, token.OR) {
+		return false
+	}
+	return TestNode(t, expr.Left, left) && TestNode(t, expr.Right, right)
+}
+
+func TestAndExpression(t *testing.T, node ast.Node, left interface{}, right interface{}) bool {
+	if !TestNodeType(t, node, ast.AND_EXPRESSION) {
+		return false
+	}
+	expr := node.(*ast.AndExpression)
+	if !testTokenType(t, expr.Token, token.AND) {
+		return false
+	}
+	return TestNode(t, expr.Left, left) && TestNode(t, expr.Right, right)
 }
 
 // ========

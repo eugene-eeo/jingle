@@ -17,6 +17,8 @@ type (
 const (
 	PREC_LOWEST     = iota
 	PREC_ASSIGNMENT // assignment
+	PREC_EQ         // ==
+	PREC_AND_OR     // &&, ||
 	PREC_ADD        // addition, subtraction
 	PREC_PRODUCT    // multiplication
 )
@@ -35,6 +37,8 @@ func (p *Parser) initExpressions() {
 		token.ASTERISK: p.parseInfixExpression,
 		token.SLASH:    p.parseInfixExpression,
 		token.ASSIGN:   p.parseAssigmentExpression,
+		token.OR:       p.parseOrExpression,
+		token.AND:      p.parseAndExpression,
 	}
 	p.precedence = map[token.TokenType]int{
 		token.PLUS:     PREC_ADD,
@@ -42,6 +46,8 @@ func (p *Parser) initExpressions() {
 		token.ASTERISK: PREC_PRODUCT,
 		token.SLASH:    PREC_PRODUCT,
 		token.ASSIGN:   PREC_ASSIGNMENT,
+		token.OR:       PREC_AND_OR,
+		token.AND:      PREC_AND_OR,
 	}
 }
 
@@ -110,6 +116,26 @@ func (p *Parser) parseParens() ast.Node {
 	expr := p.parseStatement()
 	p.expect(token.RPAREN)
 	return expr
+}
+
+func (p *Parser) parseOrExpression(left ast.Node) ast.Node {
+	opToken := p.last(1)
+	right := p.parsePrecedence(p.precedence[opToken.Type])
+	return &ast.OrExpression{
+		Token: opToken,
+		Left:  left,
+		Right: right,
+	}
+}
+
+func (p *Parser) parseAndExpression(left ast.Node) ast.Node {
+	opToken := p.last(1)
+	right := p.parsePrecedence(p.precedence[opToken.Type])
+	return &ast.AndExpression{
+		Token: opToken,
+		Left:  left,
+		Right: right,
+	}
 }
 
 // ========

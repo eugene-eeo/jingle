@@ -96,6 +96,44 @@ func (node *AssignmentExpression) String() string {
 	return out.String()
 }
 
+type OrExpression struct {
+	// The reason we need these is to implement short-circuiting
+	// expressions -- it is easier for the evaluator to do this.
+	Token token.Token // the `||` token
+	Op    string
+	Left  Node
+	Right Node
+}
+
+func (node *OrExpression) Type() NodeType { return OR_EXPRESSION }
+func (node *OrExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(node.Left.String())
+	out.WriteString(" " + node.Token.Literal + " ")
+	out.WriteString(node.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
+type AndExpression struct {
+	Token token.Token // the `&&` token
+	Op    string
+	Left  Node
+	Right Node
+}
+
+func (node *AndExpression) Type() NodeType { return AND_EXPRESSION }
+func (node *AndExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(node.Left.String())
+	out.WriteString(" " + node.Token.Literal + " ")
+	out.WriteString(node.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
 // ===========================
 // Literals
 // ===========================

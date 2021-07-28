@@ -17,12 +17,6 @@ var (
 	numberRegex = regexp.MustCompile(`^[0-9]+(\.[0-9]*)?$`)
 )
 
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 type Lexer struct {
 	Filename string
 	input    *peekRuneReader
@@ -36,20 +30,27 @@ type Lexer struct {
 	eof    *token.Token
 }
 
-func New(s string) *Lexer {
-	lexer := &Lexer{}
-	lexer.input = newPeekRuneReader(bytes.NewReader([]byte(s)))
-	lexer.Filename = ""
-	lexer.init()
-	return lexer
-}
-
-func (l *Lexer) init() {
+func TryNew(filename string, r io.RuneReader) (*Lexer, error) {
+	l := &Lexer{}
+	l.input = newPeekRuneReader(r)
+	l.Filename = ""
 	if l.lineNo != 0 {
 		panic("init() called twice")
 	}
 	l.lineNo = 1
-	must(l.advance())
+	if err := l.advance(); err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+func New(s string) *Lexer {
+	r := bytes.NewReader([]byte(s))
+	l, err := TryNew("", r)
+	if err != nil {
+		panic(err)
+	}
+	return l
 }
 
 func (l *Lexer) advance() error {

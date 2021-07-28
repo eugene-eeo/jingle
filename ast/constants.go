@@ -11,6 +11,8 @@ const (
 	// Expressions
 	INFIX_EXPRESSION
 	ASSIGNMENT_EXPRESSION
+	OR_EXPRESSION
+	AND_EXPRESSION
 
 	// Literals
 	NULL_LITERAL
@@ -30,6 +32,10 @@ func NodeTypeAsString(t NodeType) string {
 		return "INFIX_EXPRESSION"
 	case ASSIGNMENT_EXPRESSION:
 		return "ASSIGNMENT_EXPRESSION"
+	case OR_EXPRESSION:
+		return "OR_EXPRESSION"
+	case AND_EXPRESSION:
+		return "AND_EXPRESSION"
 	case NULL_LITERAL:
 		return "NULL_LITERAL"
 	case BOOL_LITERAL:
