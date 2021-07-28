@@ -145,7 +145,7 @@ func (p *Parser) parseProgram() *ast.Program {
 	hasSep := true
 	for !p.match(token.EOF) {
 		if !hasSep {
-			p.errorToken("expected a newline or semicolon")
+			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
 		prog.Nodes = append(prog.Nodes, p.parseStatement())
 		hasSep = p.matchAny(token.SEP, token.SEMICOLON)

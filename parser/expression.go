@@ -164,7 +164,7 @@ func (p *Parser) parseBlockExpression() ast.Node {
 	block.Nodes = []ast.Node{}
 	for !p.match(token.END) {
 		if !lastHasSeparator {
-			p.errorToken("expected a newline or semicolon")
+			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
 		block.Nodes = append(block.Nodes, p.parseStatement())
 		lastHasSeparator = p.matchAny(token.SEP, token.SEMICOLON)
