@@ -61,6 +61,7 @@ func (p *Parser) Parse() (program *ast.Program, err error) {
 // ===============
 // Utility methods
 // ===============
+
 func (p *Parser) last(i int) token.Token { return p.tokens[p.read-i] }
 func (p *Parser) current() token.Token   { return p.lookAhead(0) }
 
@@ -137,7 +138,7 @@ func (p *Parser) matchAny(types ...token.TokenType) bool {
 // ===============
 
 func (p *Parser) parseProgram() *ast.Program {
-	prog := &ast.Program{StartToken: p.current()}
+	prog := &ast.Program{}
 	prog.Nodes = []ast.Node{}
 	p.match(token.SEP) // initial whitespace -- ignore
 	hasSep := true
@@ -160,15 +161,14 @@ func (p *Parser) parseStatement() ast.Node {
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
-	letToken := p.current()
+	letToken := p.last(1)
 	p.expect(token.IDENT)
 	left := p.parseIdentifierLiteral()
 	p.expect(token.ASSIGN)
 	right := p.parseExpression()
 	return &ast.LetStatement{
-		StartToken: letToken,
-		EndToken:   right.End(),
-		Left:       left.(*ast.IdentifierLiteral),
-		Right:      right,
+		Token: letToken,
+		Left:  left.(*ast.IdentifierLiteral),
+		Right: right,
 	}
 }

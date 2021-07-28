@@ -7,7 +7,11 @@ const (
 	PROGRAM
 	// Statements
 	LET_STATEMENT
+
 	// Expressions
+	INFIX_EXPRESSION
+	ASSIGNMENT_EXPRESSION
+
 	// Literals
 	NULL_LITERAL
 	BOOL_LITERAL
@@ -22,6 +26,10 @@ func NodeTypeAsString(t NodeType) string {
 		return "PROGRAM"
 	case LET_STATEMENT:
 		return "LET_STATEMENT"
+	case INFIX_EXPRESSION:
+		return "INFIX_EXPRESSION"
+	case ASSIGNMENT_EXPRESSION:
+		return "ASSIGNMENT_EXPRESSION"
 	case NULL_LITERAL:
 		return "NULL_LITERAL"
 	case BOOL_LITERAL:

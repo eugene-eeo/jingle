@@ -15,10 +15,10 @@ type (
 )
 
 const (
-	LOWEST     = iota
-	ASSIGNMENT // assignment
-	ADD        // addition, subtraction
-	PRODUCT    // multiplication
+	PREC_LOWEST     = iota
+	PREC_ASSIGNMENT // assignment
+	PREC_ADD        // addition, subtraction
+	PREC_PRODUCT    // multiplication
 )
 
 func (p *Parser) initExpressions() {
@@ -27,15 +27,28 @@ func (p *Parser) initExpressions() {
 		token.NULL:   p.parseNullLiteral,
 		token.NUMBER: p.parseNumberLiteral,
 		token.STRING: p.parseStringLiteral,
+		token.LPAREN: p.parseParens,
 	}
-	p.infixHandlers = map[token.TokenType]infixParseFn{}
-	p.precedence = map[token.TokenType]int{}
+	p.infixHandlers = map[token.TokenType]infixParseFn{
+		token.PLUS:     p.parseInfixExpression,
+		token.MINUS:    p.parseInfixExpression,
+		token.ASTERISK: p.parseInfixExpression,
+		token.SLASH:    p.parseInfixExpression,
+		token.ASSIGN:   p.parseAssigmentExpression,
+	}
+	p.precedence = map[token.TokenType]int{
+		token.PLUS:     PREC_ADD,
+		token.MINUS:    PREC_ADD,
+		token.ASTERISK: PREC_PRODUCT,
+		token.SLASH:    PREC_PRODUCT,
+		token.ASSIGN:   PREC_ASSIGNMENT,
+	}
 }
 
 // ===================
 // Simple Pratt parser
 // ===================
-func (p *Parser) parseExpression() ast.Node { return p.parsePrecedence(LOWEST) }
+func (p *Parser) parseExpression() ast.Node { return p.parsePrecedence(PREC_LOWEST) }
 func (p *Parser) parsePrecedence(precedence int) ast.Node {
 	// must have a matching prefix parser, otherwise we cannot
 	// parse anything!
@@ -43,7 +56,7 @@ func (p *Parser) parsePrecedence(precedence int) ast.Node {
 	// fmt.Printf("tok=%+v\n", tok)
 	prefixParser, ok := p.prefixHandlers[tok.Type]
 	if !ok {
-		p.errorToken("unrecognised expression (%s)", tok.Type)
+		p.errorToken("unrecognised expression: %q", tok.Type)
 	}
 	left := prefixParser()
 	for precedence < p.getPrecedence(p.current().Type) {
@@ -59,14 +72,49 @@ func (p *Parser) parsePrecedence(precedence int) ast.Node {
 func (p *Parser) getPrecedence(tok token.TokenType) int {
 	prec, ok := p.precedence[tok]
 	if !ok {
-		return LOWEST
+		return PREC_LOWEST
 	}
 	return prec
 }
 
-// ===================
-// Expression Literals
-// ===================
+// ===========
+// Expressions
+// ===========
+
+func (p *Parser) parseInfixExpression(left ast.Node) ast.Node {
+	opToken := p.last(1)
+	right := p.parsePrecedence(p.precedence[opToken.Type])
+	return &ast.InfixExpression{
+		Token: opToken,
+		Op:    opToken.Literal,
+		Left:  left,
+		Right: right,
+	}
+}
+
+func (p *Parser) parseAssigmentExpression(left ast.Node) ast.Node {
+	// left should be an ident!
+	leftIdent, ok := left.(*ast.IdentifierLiteral)
+	if !ok {
+		p.errorToken("cannot assign to %s", ast.NodeTypeAsString(left.Type()))
+	}
+	return &ast.AssignmentExpression{
+		Token: p.last(1), // the '=' token
+		Left:  leftIdent,
+		Right: p.parsePrecedence(PREC_ASSIGNMENT),
+	}
+}
+
+func (p *Parser) parseParens() ast.Node {
+	// This is a grouping operator.
+	expr := p.parseStatement()
+	p.expect(token.RPAREN)
+	return expr
+}
+
+// ========
+// Literals
+// ========
 
 func (p *Parser) parseIdentifierLiteral() ast.Node {
 	return &ast.IdentifierLiteral{Token: p.last(1)}

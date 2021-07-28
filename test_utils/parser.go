@@ -16,7 +16,7 @@ type ASTString struct{ Value string }
 func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 	switch v := v.(type) {
 	case ASTIdent:
-		return TestIdent(t, node, v)
+		return TestIdentifierLiteral(t, node, v)
 	case ASTNull:
 		return TestNullLiteral(t, node)
 	case ASTNumber:
@@ -27,14 +27,44 @@ func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 	panic("unhandled type")
 }
 
-func TestIdent(t *testing.T, node ast.Node, v ASTIdent) bool {
-	if node.Type() != ast.IDENTIFIER_LITERAL {
-		t.Errorf("invalid node.Type(). expected=%s, got=%s",
-			ast.NodeTypeAsString(node.Type()),
-			ast.NodeTypeAsString(ast.IDENTIFIER_LITERAL))
+// ==========
+// Statements
+// ==========
+
+func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool {
+	if !TestNodeType(t, node, ast.LET_STATEMENT) {
+		return false
+	}
+	letStmt := node.(*ast.LetStatement)
+	return TestNode(t, letStmt.Left, left) && TestNode(t, letStmt.Right, right)
+}
+
+// ===========
+// Expressions
+// ===========
+
+func TestInfixExpression(t *testing.T, node ast.Node, left interface{}, op string, right interface{}) bool {
+	if !TestNodeType(t, node, ast.INFIX_EXPRESSION) {
+		return false
+	}
+	infixExpr := node.(*ast.InfixExpression)
+	if infixExpr.Op != op {
+		t.Errorf("invalid node.Op. expected=%q, got=%q", op, infixExpr.Op)
+		return false
+	}
+	return TestNode(t, infixExpr.Left, left) && TestNode(t, infixExpr.Right, right)
+}
+
+// ========
+// Literals
+// ========
+
+func TestIdentifierLiteral(t *testing.T, node ast.Node, v ASTIdent) bool {
+	if !TestNodeType(t, node, ast.IDENTIFIER_LITERAL) {
+		return false
 	}
 	ident := node.(*ast.IdentifierLiteral)
-	if !testLiteralToken(t, ident, token.IDENT) {
+	if !testTokenType(t, ident.Token, token.IDENT) {
 		return false
 	}
 	if ident.Name() != v.Name {
@@ -45,26 +75,22 @@ func TestIdent(t *testing.T, node ast.Node, v ASTIdent) bool {
 }
 
 func TestNullLiteral(t *testing.T, node ast.Node) bool {
-	if node.Type() != ast.NULL_LITERAL {
-		t.Errorf("invalid node.Type(). expected=%s, got=%s",
-			ast.NodeTypeAsString(node.Type()),
-			ast.NodeTypeAsString(ast.NULL_LITERAL))
+	if !TestNodeType(t, node, ast.NULL_LITERAL) {
+		return false
 	}
 	null := node.(*ast.NullLiteral)
-	if !testLiteralToken(t, null, token.NULL) {
+	if !testTokenType(t, null.Token, token.NULL) {
 		return false
 	}
 	return true
 }
 
 func TestNumberLiteral(t *testing.T, node ast.Node, v ASTNumber) bool {
-	if node.Type() != ast.NUMBER_LITERAL {
-		t.Errorf("invalid node.Type(). expected=%s, got=%s",
-			ast.NodeTypeAsString(node.Type()),
-			ast.NodeTypeAsString(ast.NUMBER_LITERAL))
+	if !TestNodeType(t, node, ast.NUMBER_LITERAL) {
+		return false
 	}
 	number := node.(*ast.NumberLiteral)
-	if !testLiteralToken(t, number, token.NUMBER) {
+	if !testTokenType(t, number.Token, token.NUMBER) {
 		return false
 	}
 	if number.Value != v.Value {
@@ -75,13 +101,11 @@ func TestNumberLiteral(t *testing.T, node ast.Node, v ASTNumber) bool {
 }
 
 func TestStringLiteral(t *testing.T, node ast.Node, v ASTString) bool {
-	if node.Type() != ast.STRING_LITERAL {
-		t.Errorf("invalid node.Type(). expected=%s, got=%s",
-			ast.NodeTypeAsString(node.Type()),
-			ast.NodeTypeAsString(ast.STRING_LITERAL))
+	if !TestNodeType(t, node, ast.STRING_LITERAL) {
+		return false
 	}
 	str := node.(*ast.StringLiteral)
-	if !testLiteralToken(t, str, token.STRING) {
+	if !testTokenType(t, str.Token, token.STRING) {
 		return false
 	}
 	if str.Value != v.Value {
@@ -91,24 +115,26 @@ func TestStringLiteral(t *testing.T, node ast.Node, v ASTString) bool {
 	return true
 }
 
-func testLiteralToken(t *testing.T, node ast.Node, tokenType token.TokenType) bool {
-	if node.Start().Type != tokenType {
-		t.Errorf("invalid node.Start().Type. expected=%s, got=%s", tokenType, node.Start().Type)
-		return false
-	}
-	if node.End().Type != tokenType {
-		t.Errorf("invalid node.End().Type. expected=%s, got=%s", tokenType, node.Start().Type)
+// ===============
+// utils for utils
+// ===============
+
+func TestNodeType(t *testing.T, node ast.Node, nodeType ast.NodeType) bool {
+	if node.Type() != nodeType {
+		t.Errorf("invalid node.Type(). expected=%s, got=%s",
+			ast.NodeTypeAsString(nodeType),
+			ast.NodeTypeAsString(node.Type()))
 		return false
 	}
 	return true
 }
 
-func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool {
-	if node.Type() != ast.LET_STATEMENT {
-		t.Errorf("invalid node.Type(). expected=%s, got=%s",
-			ast.NodeTypeAsString(node.Type()),
-			ast.NodeTypeAsString(ast.LET_STATEMENT))
+func testTokenType(t *testing.T, token token.Token, tokenType token.TokenType) bool {
+	if token.Type != tokenType {
+		t.Errorf("invalid node.Start().Type. expected=%s, got=%s",
+			tokenType,
+			token.Type)
+		return false
 	}
-	letStmt := node.(*ast.LetStatement)
-	return TestNode(t, letStmt.Left, left) && TestNode(t, letStmt.Right, right)
+	return true
 }
