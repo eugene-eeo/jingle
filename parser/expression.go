@@ -117,7 +117,7 @@ func (p *Parser) parseAssigmentExpression(left ast.Node) ast.Node {
 		return &ast.AssignmentExpression{
 			Token: p.last(1), // the '=' token
 			Left:  left,
-			Right: p.parsePrecedence(PREC_ASSIGNMENT-1),
+			Right: p.parsePrecedence(PREC_ASSIGNMENT - 1),
 		}
 	default:
 		p.errorToken("cannot assign to %s", ast.NodeTypeAsString(left.Type()))
@@ -175,7 +175,7 @@ func (p *Parser) parseBlockExpression() ast.Node {
 func (p *Parser) parseAttrExpression(left ast.Node) ast.Node {
 	// <left>.IDENT = <expr>
 	opToken := p.last(1)
-	right := p.parsePrecedence(PREC_DOT+1)
+	right := p.parsePrecedence(PREC_DOT + 1)
 	if right.Type() != ast.IDENTIFIER_LITERAL {
 		p.errorToken("unexpected %s", ast.NodeTypeAsString(right.Type()))
 	}
@@ -223,7 +223,7 @@ func (p *Parser) parseFunctionLiteral() ast.Node {
 	// "fn" "(" <ident>, ... ")" <block>
 	tok := p.last(1)
 	fn := &ast.FunctionLiteral{
-		Token: tok,
+		Token:  tok,
 		Params: []*ast.IdentifierLiteral{},
 	}
 	// parse the parameters

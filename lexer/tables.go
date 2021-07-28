@@ -11,13 +11,10 @@ type operator struct {
 	tokenType token.TokenType
 }
 
-type runePair [2]rune
-
-var oneCharOps = map[rune]token.TokenType{}
-var twoCharOps = map[runePair]token.TokenType{}
+var operators = map[string]operator{}
 
 func init() {
-	allOperators := []operator{
+	opList := []operator{
 		{"\u0000", token.EOF},
 		{".", token.DOT},
 		{";", token.SEMICOLON},
@@ -44,18 +41,7 @@ func init() {
 		{"[", token.LBRACKET},
 		{"]", token.RBRACKET},
 	}
-	for _, op := range allOperators {
-		if len(op.ch) == 1 {
-			oneCharOps[rune(op.ch[0])] = op.tokenType
-			continue
-		}
-		if len(op.ch) == 2 {
-			r := runePair{
-				rune(op.ch[0]),
-				rune(op.ch[1]),
-			}
-			twoCharOps[r] = op.tokenType
-			continue
-		}
+	for _, op := range opList {
+		operators[op.ch] = op
 	}
 }

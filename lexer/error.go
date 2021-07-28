@@ -16,8 +16,8 @@ type LexerError struct {
 func newErrorFromLexer(l *Lexer) LexerError {
 	return LexerError{
 		Filename: l.Filename,
-		LineNo:   l.lineNo,
-		Column:   l.column,
+		LineNo:   l.input.lineNo,
+		Column:   l.input.column,
 	}
 }
 

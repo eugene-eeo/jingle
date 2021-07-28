@@ -82,12 +82,13 @@ foo.bar != git
 		{token.EOF, "\u0000", 14, 1},
 	}
 	for i, test := range testTokens {
-		tok, err := l.NextToken()
-		if err != nil {
-			t.Fatalf("[%d] NextToken(): %s", i, err)
+		tok := l.NextToken()
+		if l.Error() != nil {
+			t.Fatalf("[%d] NextToken(): %s", i, l.Error())
 			return
 		}
 		if !testToken(t, tok, test) {
+			t.Errorf("[%d] test=%+v", i, test)
 			t.Fatalf("[%d] testToken() failed", i)
 			return
 		}
@@ -125,7 +126,7 @@ func TestLexString(t *testing.T) {
 	}
 	for i, test := range tests {
 		if !testOneToken(t, test.input, test.test) {
-			t.Errorf("tests[%d]: failed", i)
+			t.Fatalf("tests[%d]: failed", i)
 		}
 	}
 }
@@ -221,7 +222,8 @@ func testOneToken(
 	test interface{},
 ) bool {
 	l := lexer.New(input)
-	tok, err := l.NextToken()
+	tok := l.NextToken()
+	err := l.Error()
 	switch test := test.(type) {
 	case ParsingError:
 		if err == nil {
@@ -238,23 +240,33 @@ func testOneToken(
 		if !testParsingError(t, err, test) {
 			return false
 		}
+		tok = l.NextToken()
+		if tok.Type != token.ILLEGAL {
+			t.Errorf("expected ILLEGAL token, got=%#v", tok)
+			return false
+		}
+		if l.Error()!= err {
+			t.Errorf("expected l.NextToken() to return=%+v, got=%+v", err, l.Error())
+			return false
+		}
 	case Token:
 		if err != nil {
-			t.Errorf("l.NextToken(): %s", err)
+			t.Errorf("expected l.NextToken() to have no errors, got=%s", err)
 			return false
 		}
 		if !testToken(t, tok, test) {
 			return false
 		}
-	}
-	tok, err = l.NextToken()
-	if err != nil {
-		t.Errorf("l.NextToken(): %s", err)
-		return false
-	}
-	if tok.Type != token.EOF {
-		t.Errorf("expected EOF, got=%#v", tok)
-		return false
+		tok = l.NextToken()
+		err = l.Error()
+		if err != nil {
+			t.Errorf("l.NextToken(): %s", err)
+			return false
+		}
+		if tok.Type != token.EOF {
+			t.Errorf("expected EOF, got=%#v", tok)
+			return false
+		}
 	}
 	return true
 }

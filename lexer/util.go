@@ -9,8 +9,8 @@ func (l *Lexer) emitRuneToken(
 	return token.Token{
 		Type:    t,
 		Literal: string(ch),
-		LineNo:  l.lineNo,
-		Column:  l.column,
+		LineNo:  l.input.lineNo,
+		Column:  l.input.column,
 	}
 }
 
@@ -21,8 +21,8 @@ func (l *Lexer) emitStringToken(
 	return token.Token{
 		Type:    t,
 		Literal: lit,
-		LineNo:  l.lineNo,
-		Column:  l.column,
+		LineNo:  l.input.lineNo,
+		Column:  l.input.column,
 	}
 }
 

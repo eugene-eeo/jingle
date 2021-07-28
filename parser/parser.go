@@ -74,8 +74,8 @@ func (p *Parser) lookAhead(distance int) token.Token {
 	// lookAhead(1) => no reads
 	size := len(p.tokens)
 	for distance >= size-p.read {
-		tok, err := p.lexer.NextToken()
-		if err != nil {
+		tok := p.lexer.NextToken()
+		if err := p.lexer.Error(); err != nil {
 			p.errorErr(err)
 		}
 		p.tokens = append(p.tokens, tok)
