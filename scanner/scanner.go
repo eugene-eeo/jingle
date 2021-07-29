@@ -2,6 +2,7 @@
 package scanner
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -75,11 +76,11 @@ const (
 )
 
 var keywords = map[string]TokenType{
-	"let": TokenLet,
-	"or":  TokenOr,
-	"and": TokenAnd,
-	"fn":  TokenFn,
-	"end": TokenEnd,
+	"let":   TokenLet,
+	"or":    TokenOr,
+	"and":   TokenAnd,
+	"fn":    TokenFn,
+	"end":   TokenEnd,
 	"while": TokenWhile,
 }
 
@@ -87,7 +88,7 @@ type Scanner struct {
 	filename  string // filename
 	input     string // input
 	ch        rune   // current rune under inspection
-	pos       int    // index to the next rune to read.
+	pos       int    // how many bytes we've consumed
 	line      int    // our current positions in the input
 	col       int
 	start     int // starting position where we began reading the token
@@ -99,7 +100,7 @@ type Scanner struct {
 }
 
 func New(filename string, input string) *Scanner {
-	s := &Scanner{
+	return &Scanner{
 		filename:  filename,
 		input:     input,
 		line:      1,
@@ -109,7 +110,6 @@ func New(filename string, input string) *Scanner {
 		tokens:    []Token{},
 		errors:    []Error{},
 	}
-	return s
 }
 
 // More() returns true if there is more input to be read
@@ -130,10 +130,13 @@ func (s *Scanner) Errors() []Error {
 }
 
 // addToken adds a token under the current input.
-func (s *Scanner) addToken(typ TokenType) {
+func (s *Scanner) addToken(typ TokenType) { s.addTokenWithValue(typ, s.input[s.start:s.pos]) }
+
+// addTokenWithValue adds a token with a specified Value.
+func (s *Scanner) addTokenWithValue(typ TokenType, value string) {
 	s.tokens = append(s.tokens, Token{
 		Type:   typ,
-		Value:  s.input[s.start:s.pos],
+		Value:  value,
 		LineNo: s.startLine,
 		Column: s.startCol,
 	})
@@ -157,8 +160,8 @@ func (s *Scanner) addError(f string, args ...interface{}) {
 }
 
 func (s *Scanner) advance() rune {
-	if s.pos >= len(s.input) {
-		s.pos++ // increment here -- want to avoid More() from looping forever
+	if s.pos == len(s.input) {
+		s.pos++ // increment here to signal to More() we're done.
 		s.ch = 0
 		return s.ch
 	}
@@ -268,6 +271,8 @@ func (s *Scanner) Scan() {
 		s.addToken(TokenRBracket)
 	case ';':
 		s.addToken(TokenSemicolon)
+	case '"':
+		s.scanString()
 	default:
 		if isDigit(s.ch) {
 			s.scanNumber()
@@ -315,6 +320,52 @@ func (s *Scanner) scanNumber() {
 		s.matchRun(digits)
 	}
 	s.addToken(TokenNumber)
+}
+
+func (s *Scanner) scanString() {
+	// we're on top of a " char
+	var buf bytes.Buffer
+	escape := false // are we in escape mode?
+	for {
+		s.advance()
+		if s.ch == 0 {
+			s.addError("unexpected EOF in string literal")
+			return
+		}
+		if escape {
+			escape = false // turn it off
+			switch s.ch {
+			case '0':
+				buf.WriteByte(0)
+			case '"':
+				buf.WriteByte('"')
+			case 'n':
+				buf.WriteByte('\n')
+			case 'r':
+				buf.WriteByte('\r')
+			case 't':
+				buf.WriteByte('\t')
+			case '\\':
+				buf.WriteByte('\\')
+			default:
+				// Actually the error is one char back. This won't produce s.col < 0,
+				// since we've incremented col prior to coming here.
+				s.col--
+				s.addError("unknown escape sequence: \\%c", s.ch)
+				s.col++
+			}
+		} else {
+			switch s.ch {
+			case '\\':
+				escape = true
+			case '"':
+				s.addTokenWithValue(TokenString, buf.String())
+				return
+			default:
+				buf.WriteRune(s.ch)
+			}
+		}
+	}
 }
 
 func isAlphaNumeric(ch rune) bool {

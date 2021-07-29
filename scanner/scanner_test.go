@@ -12,6 +12,7 @@ func TestScanner(t *testing.T) {
 
 !===*/
 fn() end
+"abcdef""ghi""jkl\n\t\r\0"
 `)
 	for s.More() {
 		s.Scan()
@@ -54,7 +55,11 @@ fn() end
 		{scanner.TokenRParen, ")", 6, 4},
 		{scanner.TokenEnd, "end", 6, 6},
 		{scanner.TokenSeparator, "\n", 6, 9},
-		{scanner.TokenEOF, "", 7, 1},
+		{scanner.TokenString, "abcdef", 7, 1},
+		{scanner.TokenString, "ghi", 7, 9},
+		{scanner.TokenString, "jkl\n\t\r\u0000", 7, 14},
+		{scanner.TokenSeparator, "\n", 7, 27},
+		{scanner.TokenEOF, "", 8, 1},
 	}
 	tokens := s.Tokens()
 	for i, tok := range expected {
