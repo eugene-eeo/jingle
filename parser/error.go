@@ -2,11 +2,11 @@ package parser
 
 import (
 	"fmt"
-	"jingle/token"
+	"jingle/scanner"
 )
 
 type ParserError struct {
-	Token    *token.Token
+	Token    *scanner.Token
 	Filename string
 	Msg      string
 	Err      error
@@ -30,14 +30,14 @@ func (pe ParserError) Error() string {
 
 func (p *Parser) errorErr(e error) {
 	panic(ParserError{
-		Filename: p.lexer.Filename,
+		Filename: p.filename,
 		Err:      e,
 	})
 }
 
 func (p *Parser) errorStr(s string, args ...interface{}) {
 	panic(ParserError{
-		Filename: p.lexer.Filename,
+		Filename: p.filename,
 		Msg:      fmt.Sprintf(s, args...),
 	})
 }
@@ -45,7 +45,7 @@ func (p *Parser) errorStr(s string, args ...interface{}) {
 func (p *Parser) errorToken(s string, args ...interface{}) {
 	tok := p.last(1)
 	panic(ParserError{
-		Filename: p.lexer.Filename,
+		Filename: p.filename,
 		Token:    &tok,
 		Msg:      fmt.Sprintf(s, args...),
 	})

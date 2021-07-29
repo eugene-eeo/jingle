@@ -1,9 +1,8 @@
 package parser
 
 import (
-	// "fmt"
 	"jingle/ast"
-	"jingle/token"
+	"jingle/scanner"
 	"strconv"
 )
 
@@ -25,43 +24,42 @@ const (
 )
 
 func (p *Parser) initExpressions() {
-	p.prefixHandlers = map[token.TokenType]prefixParseFn{
-		token.IDENT:    p.parseIdentifierLiteral,
-		token.NULL:     p.parseNullLiteral,
-		token.NUMBER:   p.parseNumberLiteral,
-		token.STRING:   p.parseStringLiteral,
-		token.LPAREN:   p.parseParens,
-		token.TRUE:     p.parseBooleanLiteral,
-		token.FALSE:    p.parseBooleanLiteral,
-		token.FUNCTION: p.parseFunctionLiteral,
+	p.prefixHandlers = map[scanner.TokenType]prefixParseFn{
+		scanner.TokenIdent:   p.parseIdentifierLiteral,
+		scanner.TokenNil:     p.parseNullLiteral,
+		scanner.TokenNumber:  p.parseNumberLiteral,
+		scanner.TokenString:  p.parseStringLiteral,
+		scanner.TokenLParen:  p.parseParens,
+		scanner.TokenBoolean: p.parseBooleanLiteral,
+		scanner.TokenFn:      p.parseFunctionLiteral,
 	}
-	p.infixHandlers = map[token.TokenType]infixParseFn{
-		token.PLUS:     p.parseInfixExpression,
-		token.MINUS:    p.parseInfixExpression,
-		token.ASTERISK: p.parseInfixExpression,
-		token.SLASH:    p.parseInfixExpression,
-		token.GEQ:      p.parseInfixExpression,
-		token.LEQ:      p.parseInfixExpression,
-		token.ASSIGN:   p.parseAssigmentExpression,
-		token.OR:       p.parseOrExpression,
-		token.AND:      p.parseAndExpression,
-		token.EQ:       p.parseInfixExpression,
-		token.NOT_EQ:   p.parseInfixExpression,
-		token.DOT:      p.parseAttrExpression,
+	p.infixHandlers = map[scanner.TokenType]infixParseFn{
+		scanner.TokenPlus:  p.parseInfixExpression,
+		scanner.TokenMinus: p.parseInfixExpression,
+		scanner.TokenMul:   p.parseInfixExpression,
+		scanner.TokenDiv:   p.parseInfixExpression,
+		scanner.TokenGeq:   p.parseInfixExpression,
+		scanner.TokenLeq:   p.parseInfixExpression,
+		scanner.TokenSet:   p.parseAssigmentExpression,
+		scanner.TokenOr:    p.parseOrExpression,
+		scanner.TokenAnd:   p.parseAndExpression,
+		scanner.TokenEq:    p.parseInfixExpression,
+		scanner.TokenNeq:   p.parseInfixExpression,
+		scanner.TokenDot:   p.parseAttrExpression,
 	}
-	p.precedence = map[token.TokenType]int{
-		token.PLUS:     PREC_ADD,
-		token.MINUS:    PREC_ADD,
-		token.ASTERISK: PREC_PRODUCT,
-		token.SLASH:    PREC_PRODUCT,
-		token.ASSIGN:   PREC_ASSIGNMENT,
-		token.OR:       PREC_AND_OR,
-		token.AND:      PREC_AND_OR,
-		token.EQ:       PREC_EQ,
-		token.NOT_EQ:   PREC_EQ,
-		token.LEQ:      PREC_EQ,
-		token.GEQ:      PREC_EQ,
-		token.DOT:      PREC_DOT,
+	p.precedence = map[scanner.TokenType]int{
+		scanner.TokenPlus:  PREC_ADD,
+		scanner.TokenMinus: PREC_ADD,
+		scanner.TokenMul:   PREC_PRODUCT,
+		scanner.TokenDiv:   PREC_PRODUCT,
+		scanner.TokenSet:   PREC_ASSIGNMENT,
+		scanner.TokenOr:    PREC_AND_OR,
+		scanner.TokenAnd:   PREC_AND_OR,
+		scanner.TokenEq:    PREC_EQ,
+		scanner.TokenNeq:   PREC_EQ,
+		scanner.TokenLeq:   PREC_EQ,
+		scanner.TokenGeq:   PREC_EQ,
+		scanner.TokenDot:   PREC_DOT,
 	}
 }
 
@@ -89,7 +87,7 @@ func (p *Parser) parsePrecedence(precedence int) ast.Node {
 	return left
 }
 
-func (p *Parser) getPrecedence(tok token.TokenType) int {
+func (p *Parser) getPrecedence(tok scanner.TokenType) int {
 	prec, ok := p.precedence[tok]
 	if !ok {
 		return PREC_LOWEST
@@ -107,7 +105,7 @@ func (p *Parser) parseInfixExpression(left ast.Node) ast.Node {
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.InfixExpression{
 		Token: opToken,
-		Op:    opToken.Literal,
+		Op:    opToken.Value,
 		Left:  left,
 		Right: right,
 	}
@@ -132,7 +130,7 @@ func (p *Parser) parseAssigmentExpression(left ast.Node) ast.Node {
 func (p *Parser) parseParens() ast.Node {
 	// This is a grouping operator.
 	expr := p.parseExpression()
-	p.expect(token.RPAREN)
+	p.expect(scanner.TokenRParen)
 	return expr
 }
 
@@ -166,12 +164,12 @@ func (p *Parser) parseBlockExpression() ast.Node {
 	lastHasSeparator := true
 	block := &ast.BlockExpression{}
 	block.Nodes = []ast.Node{}
-	for !p.match(token.END) {
+	for !p.match(scanner.TokenEnd) {
 		if !lastHasSeparator {
 			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
 		block.Nodes = append(block.Nodes, p.parseStatement())
-		lastHasSeparator = p.matchAny(token.SEP, token.SEMICOLON)
+		lastHasSeparator = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
 	}
 	return block
 }
@@ -201,17 +199,17 @@ func (p *Parser) parseIdentifierLiteral() ast.Node {
 func (p *Parser) parseBooleanLiteral() ast.Node {
 	return &ast.BooleanLiteral{
 		Token: p.last(1),
-		Value: p.last(1).Type == token.TRUE,
+		Value: p.last(1).Value == "true",
 	}
 }
 
 func (p *Parser) parseNullLiteral() ast.Node {
-	return &ast.NullLiteral{Token: p.last(1)}
+	return &ast.NilLiteral{Token: p.last(1)}
 }
 
 func (p *Parser) parseNumberLiteral() ast.Node {
 	tok := p.last(1)
-	val, err := strconv.ParseFloat(tok.Literal, 64)
+	val, err := strconv.ParseFloat(tok.Value, 64)
 	if err != nil {
 		p.errorToken("invalid number: %e", err)
 	}
@@ -220,7 +218,7 @@ func (p *Parser) parseNumberLiteral() ast.Node {
 
 func (p *Parser) parseStringLiteral() ast.Node {
 	tok := p.last(1)
-	return &ast.StringLiteral{Token: tok, Value: tok.Literal}
+	return &ast.StringLiteral{Token: tok, Value: tok.Value}
 }
 
 func (p *Parser) parseFunctionLiteral() ast.Node {
@@ -231,18 +229,18 @@ func (p *Parser) parseFunctionLiteral() ast.Node {
 		Params: []*ast.IdentifierLiteral{},
 	}
 	// parse the parameters
-	p.expect(token.LPAREN)
-	for !p.match(token.RPAREN) {
-		p.expect(token.IDENT)
+	p.expect(scanner.TokenLParen)
+	for !p.match(scanner.TokenRParen) {
+		p.expect(scanner.TokenIdent)
 		ident := p.parseIdentifierLiteral()
 		// p.consume()
 		fn.Params = append(fn.Params, ident.(*ast.IdentifierLiteral))
 		// try to match a comma
-		if p.match(token.COMMA) {
+		if p.match(scanner.TokenComma) {
 			continue
 		} else {
 			// dont have a comma -- must be an RPAREN
-			p.expect(token.RPAREN)
+			p.expect(scanner.TokenRParen)
 			break
 		}
 	}

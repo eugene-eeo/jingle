@@ -3,7 +3,7 @@ package ast
 import (
 	"bytes"
 	"fmt"
-	"jingle/token"
+	"jingle/scanner"
 	"strings"
 )
 
@@ -42,7 +42,7 @@ func (node *Program) String() string {
 }
 
 type LetStatement struct {
-	Token token.Token
+	Token scanner.Token
 	Left  *IdentifierLiteral
 	Right Node
 }
@@ -51,7 +51,7 @@ func (node *LetStatement) statementNode() {}
 func (node *LetStatement) Type() NodeType { return LET_STATEMENT }
 func (node *LetStatement) String() string {
 	var out bytes.Buffer
-	out.WriteString(node.Token.Literal + " ")
+	out.WriteString(node.Token.Value + " ")
 	out.WriteString(node.Left.String())
 	out.WriteString(" = ")
 	out.WriteString(node.Right.String())
@@ -63,7 +63,7 @@ func (node *LetStatement) String() string {
 // ===========================
 
 type InfixExpression struct {
-	Token token.Token // the <op> token
+	Token scanner.Token // the <op> token
 	Op    string
 	Left  Node
 	Right Node
@@ -74,14 +74,14 @@ func (node *InfixExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
 	out.WriteString(node.Left.String())
-	out.WriteString(" " + node.Token.Literal + " ")
+	out.WriteString(" " + node.Token.Value + " ")
 	out.WriteString(node.Right.String())
 	out.WriteString(")")
 	return out.String()
 }
 
 type AssignmentExpression struct {
-	Token token.Token // the '=' token
+	Token scanner.Token // the '=' token
 	Left  Node
 	Right Node
 }
@@ -91,7 +91,7 @@ func (node *AssignmentExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
 	out.WriteString(node.Left.String())
-	out.WriteString(" " + node.Token.Literal + " ")
+	out.WriteString(" " + node.Token.Value + " ")
 	out.WriteString(node.Right.String())
 	out.WriteString(")")
 	return out.String()
@@ -100,7 +100,7 @@ func (node *AssignmentExpression) String() string {
 type OrExpression struct {
 	// The reason we need these is to implement short-circuiting
 	// expressions -- it is easier for the evaluator to do this.
-	Token token.Token // the `||` token
+	Token scanner.Token // the `||` token
 	Op    string
 	Left  Node
 	Right Node
@@ -111,14 +111,14 @@ func (node *OrExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
 	out.WriteString(node.Left.String())
-	out.WriteString(" " + node.Token.Literal + " ")
+	out.WriteString(" " + node.Token.Value + " ")
 	out.WriteString(node.Right.String())
 	out.WriteString(")")
 	return out.String()
 }
 
 type AndExpression struct {
-	Token token.Token // the `&&` token
+	Token scanner.Token // the `&&` token
 	Op    string
 	Left  Node
 	Right Node
@@ -129,7 +129,7 @@ func (node *AndExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
 	out.WriteString(node.Left.String())
-	out.WriteString(" " + node.Token.Literal + " ")
+	out.WriteString(" " + node.Token.Value + " ")
 	out.WriteString(node.Right.String())
 	out.WriteString(")")
 	return out.String()
@@ -152,7 +152,7 @@ func (node BlockExpression) String() string {
 }
 
 type AttrExpression struct {
-	Token token.Token // the '.' token
+	Token scanner.Token // the '.' token
 	Left  Node
 	Right *IdentifierLiteral
 }
@@ -163,7 +163,7 @@ func (node AttrExpression) String() string {
 	out.WriteString("(")
 	out.WriteString(node.Left.String())
 	out.WriteString(")")
-	out.WriteString(node.Token.Literal)
+	out.WriteString(node.Token.Value)
 	out.WriteString(node.Right.String())
 	return out.String()
 }
@@ -172,41 +172,41 @@ func (node AttrExpression) String() string {
 // Literals
 // ===========================
 
-type NullLiteral struct {
-	Token token.Token // the 'null' token
+type NilLiteral struct {
+	Token scanner.Token // the 'nil' token
 }
 
-func (node *NullLiteral) Type() NodeType { return NULL_LITERAL }
-func (node *NullLiteral) String() string { return node.Token.Literal }
+func (node *NilLiteral) Type() NodeType { return NIL_LITERAL }
+func (node *NilLiteral) String() string { return node.Token.Value }
 
 type BooleanLiteral struct {
-	Token token.Token // true/false token
+	Token scanner.Token // true/false token
 	Value bool
 }
 
 func (node *BooleanLiteral) Type() NodeType { return BOOLEAN_LITERAL }
-func (node *BooleanLiteral) String() string { return node.Token.Literal }
+func (node *BooleanLiteral) String() string { return node.Token.Value }
 
 type IdentifierLiteral struct {
-	Token token.Token // ident token
+	Token scanner.Token // ident token
 }
 
 func (node *IdentifierLiteral) Type() NodeType { return IDENTIFIER_LITERAL }
-func (node *IdentifierLiteral) String() string { return node.Token.Literal }
+func (node *IdentifierLiteral) String() string { return node.Token.Value }
 func (node *IdentifierLiteral) Name() string {
-	return node.Token.Literal
+	return node.Token.Value
 }
 
 type NumberLiteral struct {
-	Token token.Token // number token
+	Token scanner.Token // number token
 	Value float64
 }
 
 func (node *NumberLiteral) Type() NodeType { return NUMBER_LITERAL }
-func (node *NumberLiteral) String() string { return node.Token.Literal }
+func (node *NumberLiteral) String() string { return node.Token.Value }
 
 type StringLiteral struct {
-	Token token.Token // string token
+	Token scanner.Token // string token
 	Value string
 }
 
@@ -214,7 +214,7 @@ func (node *StringLiteral) Type() NodeType { return STRING_LITERAL }
 func (node *StringLiteral) String() string { return fmt.Sprintf("%q", node.Value) }
 
 type FunctionLiteral struct {
-	Token  token.Token // the 'fn' token
+	Token  scanner.Token // the 'fn' token
 	Params []*IdentifierLiteral
 	Body   *BlockExpression
 }
@@ -227,7 +227,7 @@ func (node *FunctionLiteral) String() string {
 		params = append(params, param.String())
 	}
 
-	buf.WriteString(node.Token.Literal)
+	buf.WriteString(node.Token.Value)
 	buf.WriteString("(")
 	buf.WriteString(strings.Join(params, ", "))
 	buf.WriteString(")")

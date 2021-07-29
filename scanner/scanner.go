@@ -1,4 +1,4 @@
-// package scanner implements a scanner for jingle.
+// Package scanner implements a scanner for jingle.
 package scanner
 
 import (
@@ -17,9 +17,10 @@ type Token struct {
 }
 
 func (t Token) String() string {
-	return fmt.Sprintf("%d(%d:%d:%q)", t.Type, t.LineNo, t.Column, t.Value)
+	return fmt.Sprintf("%s(%d:%d:%q)", t.Type, t.LineNo, t.Column, t.Value)
 }
 
+//go:generate stringer -type=TokenType
 type TokenType int
 
 type Error struct {
@@ -51,6 +52,7 @@ const (
 	TokenNumber  // floating point number (yuck)
 	TokenIdent   // identifier
 	// Delimiters
+	TokenComma     // ','
 	TokenSemicolon // ';'
 	TokenSeparator // any newlines (we are whitespace sensitive)
 	TokenLParen    // '('
@@ -77,11 +79,14 @@ const (
 
 var keywords = map[string]TokenType{
 	"let":   TokenLet,
+	"nil":   TokenNil,
 	"or":    TokenOr,
 	"and":   TokenAnd,
 	"fn":    TokenFn,
 	"end":   TokenEnd,
 	"while": TokenWhile,
+	"true":  TokenBoolean,
+	"false": TokenBoolean,
 }
 
 type Scanner struct {
@@ -127,6 +132,12 @@ func (s *Scanner) Errors() []Error {
 		return nil
 	}
 	return s.errors
+}
+
+func (s *Scanner) ScanAll() {
+	for s.More() {
+		s.Scan()
+	}
 }
 
 // addToken adds a token under the current input.
@@ -225,6 +236,8 @@ func (s *Scanner) Scan() {
 		} else {
 			s.addToken(TokenDiv)
 		}
+	case ',':
+		s.addToken(TokenComma)
 	case '=':
 		if s.match('=') {
 			s.addToken(TokenEq)

@@ -1,4 +1,4 @@
-// package parser implements a parser for the jingle language.
+// Package parser implements a parser for the jingle language.
 // the goals are for it to be easily extensible (so that it is
 // easy to add new syntax elements). The parser is a recursive
 // descent parser with arbitrary lookahead, and is lifted from
@@ -7,27 +7,26 @@ package parser
 
 import (
 	"jingle/ast"
-	"jingle/lexer"
-	"jingle/token"
+	"jingle/scanner"
 )
 
-var EmptyToken = token.Token{Type: token.ILLEGAL}
+var EOFToken = scanner.Token{Type: scanner.TokenEOF}
 
 type Parser struct {
-	lexer  *lexer.Lexer
-	tokens []token.Token // list of tokens we've read so far.
-	read   int           // number of tokens read
+	filename string
+	tokens   []scanner.Token // list of tokens from the scanner
+	read     int             // number of tokens read
 	// precedences
-	prefixHandlers map[token.TokenType]prefixParseFn
-	infixHandlers  map[token.TokenType]infixParseFn
-	precedence     map[token.TokenType]int
+	prefixHandlers map[scanner.TokenType]prefixParseFn
+	infixHandlers  map[scanner.TokenType]infixParseFn
+	precedence     map[scanner.TokenType]int
 }
 
-func New(lx *lexer.Lexer) *Parser {
+func New(filename string, tokens []scanner.Token) *Parser {
 	p := &Parser{
-		lexer:  lx,
-		tokens: []token.Token{},
-		read:   0,
+		filename: filename,
+		tokens:   tokens,
+		read:     0,
 	}
 	p.initExpressions()
 	return p
@@ -62,29 +61,23 @@ func (p *Parser) Parse() (program *ast.Program, err error) {
 // Utility methods
 // ===============
 
-func (p *Parser) last(i int) token.Token { return p.tokens[p.read-i] }
-func (p *Parser) current() token.Token   { return p.lookAhead(0) }
+func (p *Parser) last(i int) scanner.Token { return p.tokens[p.read-i] }
+func (p *Parser) current() scanner.Token   { return p.lookAhead(0) }
 
-func (p *Parser) lookAhead(distance int) token.Token {
+func (p *Parser) lookAhead(distance int) scanner.Token {
 	// [t1 ]
 	//     ^read=1
 	// lookAhead(0) => read 1
 	// [t1 t2 t3 t4]
 	//     ^read
 	// lookAhead(1) => no reads
-	size := len(p.tokens)
-	for distance >= size-p.read {
-		tok := p.lexer.NextToken()
-		if err := p.lexer.Error(); err != nil {
-			p.errorErr(err)
-		}
-		p.tokens = append(p.tokens, tok)
-		size++
+	if p.read + distance > len(p.tokens) {
+		return EOFToken
 	}
 	return p.tokens[p.read+distance]
 }
 
-func (p *Parser) expect(t token.TokenType) token.Token {
+func (p *Parser) expect(t scanner.TokenType) scanner.Token {
 	if tokType := p.current().Type; tokType != t {
 		p.consume()
 		p.errorToken("expected %s, got %s instead", t, tokType)
@@ -92,15 +85,14 @@ func (p *Parser) expect(t token.TokenType) token.Token {
 	return p.consume()
 }
 
-func (p *Parser) consume() token.Token {
-	p.lookAhead(0)
+func (p *Parser) consume() scanner.Token {
 	p.read++
 	return p.last(1)
 }
 
 // isLookAhead looks ahead at the token stream, and returns
 // true if the lookahead stream matches the given types.
-func (p *Parser) lookAheadMatches(types ...token.TokenType) bool {
+func (p *Parser) lookAheadMatches(types ...scanner.TokenType) bool {
 	for i, tokenType := range types {
 		if p.lookAhead(i).Type != tokenType {
 			return false
@@ -111,7 +103,7 @@ func (p *Parser) lookAheadMatches(types ...token.TokenType) bool {
 
 // match looks ahead at the token stream, and consumes
 // tokens if all of them match the given types.
-func (p *Parser) match(types ...token.TokenType) bool {
+func (p *Parser) match(types ...scanner.TokenType) bool {
 	if !p.lookAheadMatches(types...) {
 		return false
 	}
@@ -123,7 +115,7 @@ func (p *Parser) match(types ...token.TokenType) bool {
 }
 
 // matchAny consumes 1 token if it is _any_ of the given types.
-func (p *Parser) matchAny(types ...token.TokenType) bool {
+func (p *Parser) matchAny(types ...scanner.TokenType) bool {
 	curType := p.current().Type
 	for _, tokType := range types {
 		if curType == tokType {
@@ -141,21 +133,21 @@ func (p *Parser) matchAny(types ...token.TokenType) bool {
 func (p *Parser) parseProgram() *ast.Program {
 	prog := &ast.Program{}
 	prog.Nodes = []ast.Node{}
-	p.match(token.SEP) // initial whitespace -- ignore
+	p.match(scanner.TokenSeparator) // initial whitespace -- ignore
 	hasSep := true
-	for !p.match(token.EOF) {
+	for !p.match(scanner.TokenEOF) {
 		if !hasSep {
 			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
 		prog.Nodes = append(prog.Nodes, p.parseStatement())
-		hasSep = p.matchAny(token.SEP, token.SEMICOLON)
+		hasSep = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
 	}
 	return prog
 }
 
 func (p *Parser) parseStatement() ast.Node {
 	switch {
-	case p.match(token.LET):
+	case p.match(scanner.TokenLet):
 		return p.parseLetStatement()
 	}
 	return p.parseExpression()
@@ -163,9 +155,9 @@ func (p *Parser) parseStatement() ast.Node {
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	letToken := p.last(1)
-	p.expect(token.IDENT)
+	p.expect(scanner.TokenIdent)
 	left := p.parseIdentifierLiteral()
-	p.expect(token.ASSIGN)
+	p.expect(scanner.TokenSet)
 	right := p.parseExpression()
 	return &ast.LetStatement{
 		Token: letToken,

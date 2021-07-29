@@ -2,14 +2,14 @@ package testutils
 
 import (
 	"jingle/ast"
-	"jingle/token"
+	"jingle/scanner"
 
 	// "jingle/parser"
 	"testing"
 )
 
 type ASTIdent struct{ Name string }
-type ASTNull struct{}
+type ASTNil struct{}
 type ASTNumber struct{ Value float64 }
 type ASTString struct{ Value string }
 type ASTBoolean struct{ Value bool }
@@ -18,7 +18,7 @@ func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 	switch v := v.(type) {
 	case ASTIdent:
 		return TestIdentifierLiteral(t, node, v)
-	case ASTNull:
+	case ASTNil:
 		return TestNullLiteral(t, node)
 	case ASTNumber:
 		return TestNumberLiteral(t, node, v)
@@ -39,7 +39,7 @@ func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool
 		return false
 	}
 	letStmt := node.(*ast.LetStatement)
-	if !testTokenType(t, letStmt.Token, token.LET) {
+	if !testTokenType(t, letStmt.Token, scanner.TokenLet) {
 		return false
 	}
 	return TestNode(t, letStmt.Left, left) && TestNode(t, letStmt.Right, right)
@@ -66,7 +66,7 @@ func TestOrExpression(t *testing.T, node ast.Node, left interface{}, right inter
 		return false
 	}
 	expr := node.(*ast.OrExpression)
-	if !testTokenType(t, expr.Token, token.OR) {
+	if !testTokenType(t, expr.Token, scanner.TokenOr) {
 		return false
 	}
 	return TestNode(t, expr.Left, left) && TestNode(t, expr.Right, right)
@@ -77,7 +77,7 @@ func TestAndExpression(t *testing.T, node ast.Node, left interface{}, right inte
 		return false
 	}
 	expr := node.(*ast.AndExpression)
-	if !testTokenType(t, expr.Token, token.AND) {
+	if !testTokenType(t, expr.Token, scanner.TokenAnd) {
 		return false
 	}
 	return TestNode(t, expr.Left, left) && TestNode(t, expr.Right, right)
@@ -92,7 +92,7 @@ func TestIdentifierLiteral(t *testing.T, node ast.Node, v ASTIdent) bool {
 		return false
 	}
 	ident := node.(*ast.IdentifierLiteral)
-	if !testTokenType(t, ident.Token, token.IDENT) {
+	if !testTokenType(t, ident.Token, scanner.TokenIdent) {
 		return false
 	}
 	if ident.Name() != v.Name {
@@ -103,11 +103,11 @@ func TestIdentifierLiteral(t *testing.T, node ast.Node, v ASTIdent) bool {
 }
 
 func TestNullLiteral(t *testing.T, node ast.Node) bool {
-	if !TestNodeType(t, node, ast.NULL_LITERAL) {
+	if !TestNodeType(t, node, ast.NIL_LITERAL) {
 		return false
 	}
-	null := node.(*ast.NullLiteral)
-	if !testTokenType(t, null.Token, token.NULL) {
+	null := node.(*ast.NilLiteral)
+	if !testTokenType(t, null.Token, scanner.TokenNil) {
 		return false
 	}
 	return true
@@ -118,7 +118,7 @@ func TestNumberLiteral(t *testing.T, node ast.Node, v ASTNumber) bool {
 		return false
 	}
 	number := node.(*ast.NumberLiteral)
-	if !testTokenType(t, number.Token, token.NUMBER) {
+	if !testTokenType(t, number.Token, scanner.TokenNumber) {
 		return false
 	}
 	if number.Value != v.Value {
@@ -133,7 +133,7 @@ func TestStringLiteral(t *testing.T, node ast.Node, v ASTString) bool {
 		return false
 	}
 	str := node.(*ast.StringLiteral)
-	if !testTokenType(t, str.Token, token.STRING) {
+	if !testTokenType(t, str.Token, scanner.TokenString) {
 		return false
 	}
 	if str.Value != v.Value {
@@ -148,11 +148,7 @@ func TestBooleanLiteral(t *testing.T, node ast.Node, v ASTBoolean) bool {
 		return false
 	}
 	expr := node.(*ast.BooleanLiteral)
-	tokType := token.TokenType(token.TRUE)
-	if !v.Value {
-		tokType = token.FALSE
-	}
-	if !testTokenType(t, expr.Token, tokType) {
+	if !testTokenType(t, expr.Token, scanner.TokenBoolean) {
 		return false
 	}
 	if expr.Value != v.Value {
@@ -176,7 +172,7 @@ func TestNodeType(t *testing.T, node ast.Node, nodeType ast.NodeType) bool {
 	return true
 }
 
-func testTokenType(t *testing.T, token token.Token, tokenType token.TokenType) bool {
+func testTokenType(t *testing.T, token scanner.Token, tokenType scanner.TokenType) bool {
 	if token.Type != tokenType {
 		t.Errorf("invalid node.Start().Type. expected=%s, got=%s",
 			tokenType,

@@ -2,7 +2,7 @@ package parser_test
 
 import (
 	"jingle/ast"
-	"jingle/lexer"
+	"jingle/scanner"
 	"jingle/parser"
 	ut "jingle/test_utils"
 	"testing"
@@ -21,7 +21,7 @@ func TestParseLetStatements(t *testing.T) {
 	}{
 		{"let a = b", "let a = b", ut.ASTIdent{"a"}, ut.ASTIdent{"b"}},
 		{"let foo = bar", "let foo = bar", ut.ASTIdent{"foo"}, ut.ASTIdent{"bar"}},
-		{"let foo = null", "let foo = null", ut.ASTIdent{"foo"}, ut.ASTNull{}},
+		{"let foo = nil", "let foo = nil", ut.ASTIdent{"foo"}, ut.ASTNil{}},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)
@@ -47,7 +47,7 @@ func TestParseLiterals(t *testing.T) {
 		expected interface{}
 	}{
 		{"foobar'", ut.ASTIdent{"foobar'"}},
-		{"null", ut.ASTNull{}},
+		{"nil", ut.ASTNil{}},
 		{"100", ut.ASTNumber{100}},
 		{"5.5", ut.ASTNumber{5.5}},
 		{`"hello"`, ut.ASTString{"hello"}},
@@ -77,7 +77,7 @@ func TestParseInfixExpression(t *testing.T) {
 		right interface{}
 	}{
 		{"1 + 1", ut.ASTNumber{1}, "+", ut.ASTNumber{1}},
-		{"\"abc\" * null", ut.ASTString{"abc"}, "*", ut.ASTNull{}},
+		{"\"abc\" * nil", ut.ASTString{"abc"}, "*", ut.ASTNil{}},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)
@@ -97,16 +97,16 @@ func TestParseShortCiruiting(t *testing.T) {
 		left  interface{}
 		right interface{}
 	}{
-		{"1 || 1", "||", ut.ASTNumber{1}, ut.ASTNumber{1}},
-		{"\"abc\" || null", "||", ut.ASTString{"abc"}, ut.ASTNull{}},
-		{"def && null", "&&", ut.ASTIdent{"def"}, ut.ASTNull{}},
+		{"1 or 1", "or", ut.ASTNumber{1}, ut.ASTNumber{1}},
+		{"\"abc\" or nil", "or", ut.ASTString{"abc"}, ut.ASTNil{}},
+		{"def and nil", "and", ut.ASTIdent{"def"}, ut.ASTNil{}},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)
 		if !ok {
 			t.Fatalf("test[%d] failed", i)
 		}
-		if tt.op == "||" {
+		if tt.op == "or" {
 			if !ut.TestOrExpression(t, node, tt.left, tt.right) {
 				t.Fatalf("test[%d] failed", i)
 			}
@@ -150,7 +150,17 @@ func TestPrecedence(t *testing.T) {
 // ====================
 
 func checkParseOneline(t *testing.T, input string) (ast.Node, bool) {
-	p := parser.New(lexer.New(input))
+	s := scanner.New("", input)
+	s.ScanAll()
+	if s.Errors() != nil {
+		t.Errorf("cannot scan:\n\t%q", input)
+		t.Errorf("scanner errors:\n")
+		for _, e := range s.Errors() {
+			t.Errorf("\t%s\n", e)
+		}
+		return nil, false
+	}
+	p := parser.New("", s.Tokens())
 	program, err := p.Parse()
 	if err != nil {
 		t.Errorf("cannot parse:\n\t%q", input)

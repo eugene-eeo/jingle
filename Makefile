@@ -1,8 +1,9 @@
 build:
+	go generate ./scanner/
 	go build
 
 tests:
-	gotest ./lexer/
+	gotest ./scanner/
 	gotest ./parser/
 
 cover:
