@@ -1,8 +1,4 @@
 // Package parser implements a parser for the jingle language.
-// the goals are for it to be easily extensible (so that it is
-// easy to add new syntax elements). The parser is a recursive
-// descent parser with arbitrary lookahead, and is lifted from
-// the magpie language (https://github.com/munificent/magpie).
 package parser
 
 import (
@@ -65,12 +61,6 @@ func (p *Parser) last(i int) scanner.Token { return p.tokens[p.read-i] }
 func (p *Parser) current() scanner.Token   { return p.lookAhead(0) }
 
 func (p *Parser) lookAhead(distance int) scanner.Token {
-	// [t1 ]
-	//     ^read=1
-	// lookAhead(0) => read 1
-	// [t1 t2 t3 t4]
-	//     ^read
-	// lookAhead(1) => no reads
 	if p.read + distance > len(p.tokens) {
 		return EOFToken
 	}

@@ -1,3 +1,4 @@
+default: tests build
 build:
 	go generate ./scanner/
 	go build

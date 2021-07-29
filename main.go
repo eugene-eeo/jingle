@@ -2,13 +2,11 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
-	"jingle/lexer"
+	sc "jingle/scanner"
 	"jingle/parser"
-	"jingle/token"
 	"os"
 	"reflect"
 	"strings"
@@ -34,6 +32,14 @@ func printOkStart() {
 	)
 }
 
+func printErrors(errors []sc.Error) {
+	fmt.Printf("%s---- SCAN ERROR ----%s\n", ERR_FORMAT, ERR_RESET)
+	for _, err := range errors {
+		fmt.Printf("%s\n", err)
+	}
+	fmt.Printf("%s--------------------%s\n", ERR_FORMAT, ERR_RESET)
+}
+
 func printError(err error) {
 	fmt.Printf("%s------ ERROR ------%s\n%s\n%s-------------------%s\n",
 		ERR_FORMAT,
@@ -54,13 +60,14 @@ func main() {
 		if !scanner.Scan() {
 			break
 		}
-		buf := bytes.NewBuffer(scanner.Bytes())
-		lexer, err := lexer.TryNew("<stdin>", buf)
-		if err != nil {
-			printError(err)
+		input := string(scanner.Bytes())
+		lex := sc.New("<stdin>", input)
+		lex.ScanAll()
+		if lex.Errors() != nil {
+			printErrors(lex.Errors())
 			continue
 		}
-		p := parser.New(lexer)
+		p := parser.New("<stdin>", lex.Tokens())
 		program, err := p.Parse()
 		if err != nil {
 			printError(err)
@@ -85,9 +92,9 @@ type w interface {
 }
 
 func Frprint(out w, value interface{}, level int) {
-	if token, ok := value.(token.Token); ok {
+	if token, ok := value.(sc.Token); ok {
 		// compact formatting for token
-		fmt.Fprintf(out, "%s(%d:%d:%q)", token.Type, token.LineNo, token.Column, token.Literal)
+		fmt.Fprintf(out, "%s", token)
 		return
 	}
 	v := reflect.ValueOf(value)
