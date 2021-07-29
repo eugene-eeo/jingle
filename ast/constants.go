@@ -18,7 +18,7 @@ const (
 
 	// Literals
 	NULL_LITERAL
-	BOOL_LITERAL
+	BOOLEAN_LITERAL
 	IDENTIFIER_LITERAL
 	NUMBER_LITERAL
 	STRING_LITERAL
@@ -45,7 +45,7 @@ func NodeTypeAsString(t NodeType) string {
 		return "ATTR_EXPRESSION"
 	case NULL_LITERAL:
 		return "NULL_LITERAL"
-	case BOOL_LITERAL:
+	case BOOLEAN_LITERAL:
 		return "BOOL_LITERAL"
 	case IDENTIFIER_LITERAL:
 		return "IDENTIFIER_LITERAL"

@@ -184,7 +184,7 @@ type BooleanLiteral struct {
 	Value bool
 }
 
-func (node *BooleanLiteral) Type() NodeType { return BOOL_LITERAL }
+func (node *BooleanLiteral) Type() NodeType { return BOOLEAN_LITERAL }
 func (node *BooleanLiteral) String() string { return node.Token.Literal }
 
 type IdentifierLiteral struct {

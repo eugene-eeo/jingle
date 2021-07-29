@@ -41,10 +41,6 @@ func New(s string) *Lexer {
 	return NewFromReader("", bytes.NewReader([]byte(s)))
 }
 
-func (l *Lexer) More() bool {
-	return l.err == nil
-}
-
 func (l *Lexer) Error() error {
 	if l.err == io.EOF {
 		return nil
@@ -59,8 +55,11 @@ func (l *Lexer) advance() {
 	r, err := l.input.Next()
 	l.ch = r
 	if err != nil {
-		l.ch = 0
+		if err != io.EOF {
+			err = l.wrapError(err)
+		}
 		l.err = err
+		l.ch = 0
 		return
 	}
 }
@@ -186,12 +185,6 @@ func (l *Lexer) scanSeparators() token.Token {
 		// consume one, and then continue eating separators
 		buf.WriteRune(l.ch)
 		l.advance()
-		if l.err != nil {
-			if l.err == io.EOF {
-				break
-			}
-			return ErrorToken
-		}
 	}
 	tok.Literal = buf.String()
 	return tok

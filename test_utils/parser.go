@@ -12,6 +12,7 @@ type ASTIdent struct{ Name string }
 type ASTNull struct{}
 type ASTNumber struct{ Value float64 }
 type ASTString struct{ Value string }
+type ASTBoolean struct{ Value bool }
 
 func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 	switch v := v.(type) {
@@ -23,6 +24,8 @@ func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 		return TestNumberLiteral(t, node, v)
 	case ASTString:
 		return TestStringLiteral(t, node, v)
+	case ASTBoolean:
+		return TestBooleanLiteral(t, node, v)
 	}
 	panic("unhandled type")
 }
@@ -135,6 +138,25 @@ func TestStringLiteral(t *testing.T, node ast.Node, v ASTString) bool {
 	}
 	if str.Value != v.Value {
 		t.Errorf("invalid node.Value. expected=%q, got=%q", v, str.Value)
+		return false
+	}
+	return true
+}
+
+func TestBooleanLiteral(t *testing.T, node ast.Node, v ASTBoolean) bool {
+	if !TestNodeType(t, node, ast.BOOLEAN_LITERAL) {
+		return false
+	}
+	expr := node.(*ast.BooleanLiteral)
+	tokType := token.TokenType(token.TRUE)
+	if !v.Value {
+		tokType = token.FALSE
+	}
+	if !testTokenType(t, expr.Token, tokType) {
+		return false
+	}
+	if expr.Value != v.Value {
+		t.Errorf("invalid node.Value. expected=%t, got=%t", v, expr.Value)
 		return false
 	}
 	return true

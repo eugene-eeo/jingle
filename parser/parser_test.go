@@ -51,6 +51,8 @@ func TestParseLiterals(t *testing.T) {
 		{"100", ut.ASTNumber{100}},
 		{"5.5", ut.ASTNumber{5.5}},
 		{`"hello"`, ut.ASTString{"hello"}},
+		{`true`, ut.ASTBoolean{true}},
+		{`false`, ut.ASTBoolean{false}},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)
@@ -128,6 +130,9 @@ func TestPrecedence(t *testing.T) {
 		{"1 / 2 * 3", "((1 / 2) * 3)"},
 		{"a = b * c", "(a = (b * c))"},
 		{"a * (b + c)", "(a * (b + c))"},
+		{"a = b = c", "(a = (b = c))"},
+		{"a.b.c", "((a).b).c"},
+		{"d = a.b.c", "(d = ((a).b).c)"},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)

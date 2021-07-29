@@ -131,6 +131,24 @@ func TestLexString(t *testing.T) {
 	}
 }
 
+func TestLexerError(t *testing.T) {
+	tests := []struct {
+		input string
+		regex string
+	}{
+		{"$", `^:1:1:`},
+		{" a$", `^:1:2:`},
+		{`    1$`, `^:1:5:`},
+		{"\n1.s34\ndef", `^:2:1:`},
+		{"abc\nq = \"abc\n\"", `^:2:9:`},
+	}
+	for i, test := range tests {
+		if !testParserError(t, test.input, ParsingError{regexp.MustCompile(test.regex)}) {
+			t.Errorf("tests[%d]: failed", i)
+		}
+	}
+}
+
 // =================
 // Testing Utilities
 // =================
@@ -214,6 +232,38 @@ func testParsingError(
 	return true
 }
 
+// testParserError asserts that the given input eventually
+// produces a parser error.
+func testParserError(t *testing.T, input string, test ParsingError) bool {
+	l := lexer.New(input)
+	for {
+		tok := l.NextToken()
+		if tok.Type == token.EOF {
+			t.Errorf("expected parser to return error")
+			return false
+		}
+		err := l.Error()
+		if err != nil {
+			if !testParsingError(t, err, test) {
+				return false
+			}
+			tok = l.NextToken()
+			if tok.Type != token.ILLEGAL {
+				t.Errorf("expected NextToken() after error to return ILLEGAL. got=%+v",
+					tok)
+				return false
+			}
+			if l.Error() != err {
+				t.Errorf("invalid lexer.Error(). expected=%e, got=%e",
+					err,
+					l.Error())
+				return false
+			}
+			return true
+		}
+	}
+}
+
 // testOneToken asserts that the given input produces exactly
 // one token.
 func testOneToken(
@@ -245,7 +295,7 @@ func testOneToken(
 			t.Errorf("expected ILLEGAL token, got=%#v", tok)
 			return false
 		}
-		if l.Error()!= err {
+		if l.Error() != err {
 			t.Errorf("expected l.NextToken() to return=%+v, got=%+v", err, l.Error())
 			return false
 		}

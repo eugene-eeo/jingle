@@ -18,7 +18,7 @@ const (
 	PREC_LOWEST     = iota
 	PREC_ASSIGNMENT // assignment
 	PREC_DOT        // attr access
-	PREC_EQ         // ==
+	PREC_EQ         // ==, >=, !=
 	PREC_AND_OR     // &&, ||
 	PREC_ADD        // addition, subtraction
 	PREC_PRODUCT    // multiplication
@@ -40,6 +40,8 @@ func (p *Parser) initExpressions() {
 		token.MINUS:    p.parseInfixExpression,
 		token.ASTERISK: p.parseInfixExpression,
 		token.SLASH:    p.parseInfixExpression,
+		token.GEQ:      p.parseInfixExpression,
+		token.LEQ:      p.parseInfixExpression,
 		token.ASSIGN:   p.parseAssigmentExpression,
 		token.OR:       p.parseOrExpression,
 		token.AND:      p.parseAndExpression,
@@ -57,6 +59,8 @@ func (p *Parser) initExpressions() {
 		token.AND:      PREC_AND_OR,
 		token.EQ:       PREC_EQ,
 		token.NOT_EQ:   PREC_EQ,
+		token.LEQ:      PREC_EQ,
+		token.GEQ:      PREC_EQ,
 		token.DOT:      PREC_DOT,
 	}
 }
