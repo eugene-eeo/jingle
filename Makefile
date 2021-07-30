@@ -1,6 +1,6 @@
 default: tests build
 build:
-	go generate ./scanner/
+	go generate ./...
 	go build
 
 tests:

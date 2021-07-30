@@ -25,13 +25,14 @@ const (
 
 func (p *Parser) initExpressions() {
 	p.prefixHandlers = map[scanner.TokenType]prefixParseFn{
-		scanner.TokenIdent:   p.parseIdentifierLiteral,
-		scanner.TokenNil:     p.parseNullLiteral,
-		scanner.TokenNumber:  p.parseNumberLiteral,
-		scanner.TokenString:  p.parseStringLiteral,
-		scanner.TokenLParen:  p.parseParens,
-		scanner.TokenBoolean: p.parseBooleanLiteral,
-		scanner.TokenFn:      p.parseFunctionLiteral,
+		scanner.TokenIdent:    p.parseIdentifierLiteral,
+		scanner.TokenNil:      p.parseNullLiteral,
+		scanner.TokenNumber:   p.parseNumberLiteral,
+		scanner.TokenString:   p.parseStringLiteral,
+		scanner.TokenLParen:   p.parseParens,
+		scanner.TokenBoolean:  p.parseBooleanLiteral,
+		scanner.TokenFn:       p.parseFunctionLiteral,
+		scanner.TokenLBracket: p.parseArrayLiteral,
 	}
 	p.infixHandlers = map[scanner.TokenType]infixParseFn{
 		scanner.TokenPlus:  p.parseInfixExpression,
@@ -113,17 +114,14 @@ func (p *Parser) parseInfixExpression(left ast.Node) ast.Node {
 
 func (p *Parser) parseAssigmentExpression(left ast.Node) ast.Node {
 	// <left> = <right>
-	switch left.Type() {
-	// for now, left should be an ident.
-	case ast.IDENTIFIER_LITERAL:
-		return &ast.AssignmentExpression{
-			Token: p.last(1), // the '=' token
-			Left:  left,
-			Right: p.parsePrecedence(PREC_ASSIGNMENT - 1),
-		}
-	default:
-		p.errorToken("cannot assign to %s", ast.NodeTypeAsString(left.Type()))
+	if !ast.Assignable(left) {
+		p.errorToken("cannot assign to %s", left.Type())
 		return nil // not reachable
+	}
+	return &ast.AssignmentExpression{
+		Token: p.last(1), // the '=' token
+		Left:  left,
+		Right: p.parsePrecedence(PREC_ASSIGNMENT - 1),
 	}
 }
 
@@ -154,32 +152,12 @@ func (p *Parser) parseAndExpression(left ast.Node) ast.Node {
 	}
 }
 
-func (p *Parser) parseBlockExpression() ast.Node {
-	// No token needed for a parseBlock.
-	// block expressions:
-	//       expr
-	//       expr
-	//       ...
-	//    end
-	lastHasSeparator := true
-	block := &ast.BlockExpression{}
-	block.Nodes = []ast.Node{}
-	for !p.match(scanner.TokenEnd) {
-		if !lastHasSeparator {
-			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
-		}
-		block.Nodes = append(block.Nodes, p.parseStatement())
-		lastHasSeparator = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
-	}
-	return block
-}
-
 func (p *Parser) parseAttrExpression(left ast.Node) ast.Node {
 	// <left>.IDENT = <expr>
 	opToken := p.last(1)
 	right := p.parsePrecedence(PREC_DOT + 1)
 	if right.Type() != ast.IDENTIFIER_LITERAL {
-		p.errorToken("unexpected %s", ast.NodeTypeAsString(right.Type()))
+		p.errorToken("unexpected %s", right.Type())
 	}
 	return &ast.AttrExpression{
 		Token: opToken,
@@ -222,7 +200,8 @@ func (p *Parser) parseStringLiteral() ast.Node {
 }
 
 func (p *Parser) parseFunctionLiteral() ast.Node {
-	// "fn" "(" <ident>, ... ")" <block>
+	// fn → "fn" "(" params ")" block
+	// params → nothing | ident ("," | "," params)?
 	tok := p.last(1)
 	fn := &ast.FunctionLiteral{
 		Token:  tok,
@@ -233,17 +212,30 @@ func (p *Parser) parseFunctionLiteral() ast.Node {
 	for !p.match(scanner.TokenRParen) {
 		p.expect(scanner.TokenIdent)
 		ident := p.parseIdentifierLiteral()
-		// p.consume()
 		fn.Params = append(fn.Params, ident.(*ast.IdentifierLiteral))
-		// try to match a comma
-		if p.match(scanner.TokenComma) {
-			continue
-		} else {
+		if !p.match(scanner.TokenComma) {
 			// dont have a comma -- must be an RPAREN
 			p.expect(scanner.TokenRParen)
 			break
 		}
 	}
-	fn.Body = p.parseBlockExpression().(*ast.BlockExpression)
+	fn.Body = p.parseBlock().(*ast.Block)
 	return fn
+}
+
+func (p *Parser) parseArrayLiteral() ast.Node {
+	// list → "[" listElems "]"
+	// listElems → nothing | <expr> ( "," | "," listElems )?
+	tok := p.last(1)
+	arr := &ast.ArrayLiteral{Token: tok, Elems: []ast.Node{}}
+	for !p.match(scanner.TokenRBracket) {
+		node := p.parseExpression()
+		arr.Elems = append(arr.Elems, node)
+		if !p.match(scanner.TokenComma) {
+			// must be a RBracket
+			p.expect(scanner.TokenRBracket)
+			break
+		}
+	}
+	return arr
 }

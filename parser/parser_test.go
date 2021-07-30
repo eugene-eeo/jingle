@@ -2,8 +2,8 @@ package parser_test
 
 import (
 	"jingle/ast"
-	"jingle/scanner"
 	"jingle/parser"
+	"jingle/scanner"
 	ut "jingle/test_utils"
 	"testing"
 )
@@ -16,19 +16,32 @@ func TestParseLetStatements(t *testing.T) {
 	tests := []struct {
 		input  string
 		output string
-		left   interface{}
-		right  interface{}
+		bindings []interface{}
 	}{
-		{"let a = b", "let a = b", ut.ASTIdent{"a"}, ut.ASTIdent{"b"}},
-		{"let foo = bar", "let foo = bar", ut.ASTIdent{"foo"}, ut.ASTIdent{"bar"}},
-		{"let foo = nil", "let foo = nil", ut.ASTIdent{"foo"}, ut.ASTNil{}},
+		{"let a = b", "let (a = b)", []interface{}{ut.ASTAssign{ut.ASTIdent{"a"}, ut.ASTIdent{"b"}}}},
+		{"let foo = nil", "let (foo = nil)", []interface{}{ut.ASTAssign{ut.ASTIdent{"foo"}, ut.ASTNil{}}}},
+		{"let foo,abc=true", "let foo, (abc = true)", []interface{}{
+			ut.ASTIdent{"foo"},
+			ut.ASTAssign{ut.ASTIdent{"abc"}, ut.ASTBoolean{true}},
+		}},
+		{"let foo,bar,baz=nil", "let foo, bar, (baz = nil)", []interface{}{
+			ut.ASTIdent{"foo"},
+			ut.ASTIdent{"bar"},
+			ut.ASTAssign{ut.ASTIdent{"baz"}, ut.ASTNil{}},
+		}},
+		{"let [bar]=[1]", "let ([bar] = [1])", []interface{}{
+			ut.ASTAssign{
+				ut.ASTArray{ut.ASTIdent{"bar"}},
+				ut.ASTArray{ut.ASTNumber{1}},
+			},
+		}},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)
 		if !ok {
 			t.Fatalf("test[%d] failed", i)
 		}
-		if !ut.TestLetStatement(t, node, tt.left, tt.right) {
+		if !ut.TestLetStatement(t, node, tt.bindings...) {
 			t.Fatalf("test[%d] failed", i)
 		}
 		if node.String() != tt.output {
@@ -53,6 +66,7 @@ func TestParseLiterals(t *testing.T) {
 		{`"hello"`, ut.ASTString{"hello"}},
 		{`true`, ut.ASTBoolean{true}},
 		{`false`, ut.ASTBoolean{false}},
+		{`[1,true,nil]`, ut.ASTArray{ut.ASTNumber{1}, ut.ASTBoolean{true}, ut.ASTNil{}}},
 	}
 	for i, tt := range tests {
 		node, ok := checkParseOneline(t, tt.input)

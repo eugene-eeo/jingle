@@ -1,5 +1,7 @@
 package ast
 
+//go:generate stringer -type=NodeType
+
 type NodeType uint
 
 const (
@@ -7,6 +9,7 @@ const (
 	PROGRAM
 	// Statements
 	LET_STATEMENT
+	FOR_STATEMENT
 
 	// Expressions
 	INFIX_EXPRESSION
@@ -23,38 +26,5 @@ const (
 	NUMBER_LITERAL
 	STRING_LITERAL
 	FUNCTION_LITERAL
+	ARRAY_LITERAL
 )
-
-func NodeTypeAsString(t NodeType) string {
-	switch t {
-	case PROGRAM:
-		return "PROGRAM"
-	case LET_STATEMENT:
-		return "LET_STATEMENT"
-	case INFIX_EXPRESSION:
-		return "INFIX_EXPRESSION"
-	case ASSIGNMENT_EXPRESSION:
-		return "ASSIGNMENT_EXPRESSION"
-	case OR_EXPRESSION:
-		return "OR_EXPRESSION"
-	case AND_EXPRESSION:
-		return "AND_EXPRESSION"
-	case BLOCK_EXPRESSION:
-		return "BLOCK_EXPRESSION"
-	case ATTR_EXPRESSION:
-		return "ATTR_EXPRESSION"
-	case NIL_LITERAL:
-		return "NIL_LITERAL"
-	case BOOLEAN_LITERAL:
-		return "BOOL_LITERAL"
-	case IDENTIFIER_LITERAL:
-		return "IDENTIFIER_LITERAL"
-	case NUMBER_LITERAL:
-		return "NUMBER_LITERAL"
-	case STRING_LITERAL:
-		return "STRING_LITERAL"
-	case FUNCTION_LITERAL:
-		return "FUNCTION_LITERAL"
-	}
-	return "<Unknown>"
-}

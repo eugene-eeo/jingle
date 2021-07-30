@@ -42,19 +42,56 @@ func (node *Program) String() string {
 }
 
 type LetStatement struct {
-	Token scanner.Token
-	Left  *IdentifierLiteral
-	Right Node
+	Token    scanner.Token
+	Bindings []Node
 }
 
 func (node *LetStatement) statementNode() {}
 func (node *LetStatement) Type() NodeType { return LET_STATEMENT }
 func (node *LetStatement) String() string {
 	var out bytes.Buffer
+	bindings := []string{}
+	for _, b := range node.Bindings {
+		bindings = append(bindings, b.String())
+	}
 	out.WriteString(node.Token.Value + " ")
-	out.WriteString(node.Left.String())
-	out.WriteString(" = ")
-	out.WriteString(node.Right.String())
+	out.WriteString(strings.Join(bindings, ", "))
+	return out.String()
+}
+
+type ForStatement struct {
+	Token    scanner.Token // the 'for' token
+	Binding  *IdentifierLiteral
+	Iterable Node
+	Body     *Block
+}
+
+func (node ForStatement) Type() NodeType { return FOR_STATEMENT }
+func (node ForStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(node.Token.Value)
+	out.WriteString(" ")
+	out.WriteString(node.Binding.String())
+	out.WriteString(" in ")
+	out.WriteString(node.Iterable.String())
+	out.WriteString(" do")
+	out.WriteString(node.Body.String())
+	return out.String()
+}
+
+type Block struct {
+	Nodes []Node
+}
+
+func (node Block) Type() NodeType { return BLOCK_EXPRESSION }
+func (node Block) String() string {
+	var out bytes.Buffer
+	out.WriteString(" ")
+	for _, stmt := range node.Nodes {
+		out.WriteString(stmt.String())
+		out.WriteString("; ")
+	}
+	out.WriteString("end")
 	return out.String()
 }
 
@@ -86,7 +123,7 @@ type AssignmentExpression struct {
 	Right Node
 }
 
-func (node *AssignmentExpression) Type() NodeType { return INFIX_EXPRESSION }
+func (node *AssignmentExpression) Type() NodeType { return ASSIGNMENT_EXPRESSION }
 func (node *AssignmentExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -132,22 +169,6 @@ func (node *AndExpression) String() string {
 	out.WriteString(" " + node.Token.Value + " ")
 	out.WriteString(node.Right.String())
 	out.WriteString(")")
-	return out.String()
-}
-
-type BlockExpression struct {
-	Nodes []Node
-}
-
-func (node BlockExpression) Type() NodeType { return BLOCK_EXPRESSION }
-func (node BlockExpression) String() string {
-	var out bytes.Buffer
-	out.WriteString(" ")
-	for _, stmt := range node.Nodes {
-		out.WriteString(stmt.String())
-		out.WriteString("; ")
-	}
-	out.WriteString("end")
 	return out.String()
 }
 
@@ -216,7 +237,7 @@ func (node *StringLiteral) String() string { return fmt.Sprintf("%q", node.Value
 type FunctionLiteral struct {
 	Token  scanner.Token // the 'fn' token
 	Params []*IdentifierLiteral
-	Body   *BlockExpression
+	Body   *Block
 }
 
 func (node *FunctionLiteral) Type() NodeType { return FUNCTION_LITERAL }
@@ -232,5 +253,24 @@ func (node *FunctionLiteral) String() string {
 	buf.WriteString(strings.Join(params, ", "))
 	buf.WriteString(")")
 	buf.WriteString(node.Body.String())
+	return buf.String()
+}
+
+type ArrayLiteral struct {
+	Token scanner.Token // the 'fn' token
+	Elems []Node
+}
+
+func (node *ArrayLiteral) Type() NodeType { return ARRAY_LITERAL }
+func (node *ArrayLiteral) String() string {
+	var buf bytes.Buffer
+	elems := []string{}
+	for _, elem := range node.Elems {
+		elems = append(elems, elem.String())
+	}
+
+	buf.WriteString(node.Token.Value)
+	buf.WriteString(strings.Join(elems, ", "))
+	buf.WriteString("]")
 	return buf.String()
 }

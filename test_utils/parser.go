@@ -13,6 +13,11 @@ type ASTNil struct{}
 type ASTNumber struct{ Value float64 }
 type ASTString struct{ Value string }
 type ASTBoolean struct{ Value bool }
+type ASTArray []interface{}
+type ASTAssign struct {
+	Left  interface{}
+	Right interface{}
+}
 
 func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 	switch v := v.(type) {
@@ -26,6 +31,10 @@ func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 		return TestStringLiteral(t, node, v)
 	case ASTBoolean:
 		return TestBooleanLiteral(t, node, v)
+	case ASTAssign:
+		return TestAssignmentExpression(t, node, v)
+	case ASTArray:
+		return TestArrayLiteral(t, node, v)
 	}
 	panic("unhandled type")
 }
@@ -34,7 +43,7 @@ func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 // Statements
 // ==========
 
-func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool {
+func TestLetStatement(t *testing.T, node ast.Node, args ...interface{}) bool {
 	if !TestNodeType(t, node, ast.LET_STATEMENT) {
 		return false
 	}
@@ -42,7 +51,17 @@ func TestLetStatement(t *testing.T, node ast.Node, left, right interface{}) bool
 	if !testTokenType(t, letStmt.Token, scanner.TokenLet) {
 		return false
 	}
-	return TestNode(t, letStmt.Left, left) && TestNode(t, letStmt.Right, right)
+	if len(args) != len(letStmt.Bindings) {
+		t.Errorf("expected %d bindings, got=%d", len(args), len(letStmt.Bindings))
+		return false
+	}
+	for i, b := range letStmt.Bindings {
+		if !TestNode(t, b, args[i]) {
+			t.Errorf("args[%d]: expected=%+v got=%+v", i, args[i], b)
+			return false
+		}
+	}
+	return true
 }
 
 // ===========
@@ -81,6 +100,17 @@ func TestAndExpression(t *testing.T, node ast.Node, left interface{}, right inte
 		return false
 	}
 	return TestNode(t, expr.Left, left) && TestNode(t, expr.Right, right)
+}
+
+func TestAssignmentExpression(t *testing.T, node ast.Node, v ASTAssign) bool {
+	if !TestNodeType(t, node, ast.ASSIGNMENT_EXPRESSION) {
+		return false
+	}
+	expr := node.(*ast.AssignmentExpression)
+	if !testTokenType(t, expr.Token, scanner.TokenSet) {
+		return false
+	}
+	return TestNode(t, expr.Left, v.Left) && TestNode(t, expr.Right, v.Right)
 }
 
 // ========
@@ -158,6 +188,29 @@ func TestBooleanLiteral(t *testing.T, node ast.Node, v ASTBoolean) bool {
 	return true
 }
 
+func TestArrayLiteral(t *testing.T, node ast.Node, v ASTArray) bool {
+	if !TestNodeType(t, node, ast.ARRAY_LITERAL) {
+		return false
+	}
+	expr := node.(*ast.ArrayLiteral)
+	if !testTokenType(t, expr.Token, scanner.TokenLBracket) {
+		return false
+	}
+	if len(v) != len(expr.Elems) {
+		t.Errorf("invalid no. of elements. expected=%d, got=%d",
+			len(v), len(expr.Elems))
+		return false
+	}
+	for i, elem := range expr.Elems {
+		if !TestNode(t, elem, v[i]) {
+			t.Errorf("elems[%d] expected=%+v, got=%+v",
+				i, v[i], elem)
+			return false
+		}
+	}
+	return true
+}
+
 // ===============
 // utils for utils
 // ===============
@@ -165,8 +218,8 @@ func TestBooleanLiteral(t *testing.T, node ast.Node, v ASTBoolean) bool {
 func TestNodeType(t *testing.T, node ast.Node, nodeType ast.NodeType) bool {
 	if node.Type() != nodeType {
 		t.Errorf("invalid node.Type(). expected=%s, got=%s",
-			ast.NodeTypeAsString(nodeType),
-			ast.NodeTypeAsString(node.Type()))
+			nodeType,
+			node.Type())
 		return false
 	}
 	return true

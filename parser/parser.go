@@ -69,6 +69,7 @@ func (p *Parser) lookAhead(distance int) scanner.Token {
 
 func (p *Parser) expect(t scanner.TokenType) scanner.Token {
 	if tokType := p.current().Type; tokType != t {
+		// for the error message.
 		p.consume()
 		p.errorToken("expected %s, got %s instead", t, tokType)
 	}
@@ -139,19 +140,58 @@ func (p *Parser) parseStatement() ast.Node {
 	switch {
 	case p.match(scanner.TokenLet):
 		return p.parseLetStatement()
+	case p.match(scanner.TokenFor):
+		return p.parseForStatement()
 	}
 	return p.parseExpression()
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
-	letToken := p.last(1)
-	p.expect(scanner.TokenIdent)
-	left := p.parseIdentifierLiteral()
-	p.expect(scanner.TokenSet)
-	right := p.parseExpression()
-	return &ast.LetStatement{
-		Token: letToken,
-		Left:  left.(*ast.IdentifierLiteral),
-		Right: right,
+	// let → "let" bindings
+	// bindings → assignable ("," bindings)?
+	letNode := &ast.LetStatement{Token: p.last(1)}
+	letNode.Bindings = []ast.Node{}
+	for {
+		node := p.parseExpression()
+		if !ast.Assignable(node) {
+			p.errorToken("cannot assign to %s", node.Type())
+		}
+		if node.Type() == ast.ARRAY_LITERAL {
+			p.errorToken("%s cannot be a top-level declaration", node.Type())
+		}
+		letNode.Bindings = append(letNode.Bindings, node)
+		if !p.match(scanner.TokenComma) {
+			break
+		}
 	}
+	return letNode
+}
+
+func (p *Parser) parseBlock() ast.Node {
+	// block → blockStmts "end"
+	// blockStmts → nothing | stmt ("sep" blockStmts)?
+	lastHasSeparator := true
+	block := &ast.Block{}
+	block.Nodes = []ast.Node{}
+	for !p.match(scanner.TokenEnd) {
+		if !lastHasSeparator {
+			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
+		}
+		block.Nodes = append(block.Nodes, p.parseStatement())
+		lastHasSeparator = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
+	}
+	return block
+}
+
+func (p *Parser) parseForStatement() ast.Node {
+	// for → "for" "ident" "in" expr "do" block
+	node := &ast.ForStatement{Token: p.last(1)}
+	p.expect(scanner.TokenIdent)
+	p.last(1)
+	node.Binding = p.parseIdentifierLiteral().(*ast.IdentifierLiteral)
+	p.expect(scanner.TokenIn)
+	node.Iterable = p.parseExpression()
+	p.expect(scanner.TokenDo)
+	node.Body = p.parseBlock().(*ast.Block)
+	return node
 }
