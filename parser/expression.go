@@ -199,7 +199,7 @@ func (p *Parser) parseStringLiteral() ast.Expression {
 }
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
-	// fn → "fn" "(" params ")" block
+	// fn → "fn" "(" params ")" stmt* "end"
 	// params → nothing | ident ("," | "," params)?
 	tok := p.last(1)
 	fn := &ast.FunctionLiteral{
@@ -218,7 +218,7 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 			break
 		}
 	}
-	fn.Body = p.parseBlock()
+	fn.Body = p.parseBlock(scanner.TokenEnd)
 	return fn
 }
 

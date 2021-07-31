@@ -145,31 +145,34 @@ func (p *Parser) parseStatement() ast.Statement {
 	return &ast.ExpressionStatement{Expr: p.parseExpression()}
 }
 
-func (p *Parser) parseBlock() *ast.Block {
-	// block → blockStmts "end"
+func (p *Parser) parseBlock(terminal scanner.TokenType) *ast.Block {
+	// block → blockStmts <terminal>
 	// blockStmts → nothing | stmt ("sep" blockStmts)?
 	lastHasSeparator := true
 	block := &ast.Block{}
 	block.Statements = []ast.Statement{}
-	for !p.match(scanner.TokenEnd) {
+	for !p.match(terminal) {
 		if !lastHasSeparator {
 			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
 		block.Statements = append(block.Statements, p.parseStatement())
 		lastHasSeparator = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
 	}
+	block.Terminal = p.last(1)
 	return block
 }
 
 func (p *Parser) parseForStatement() *ast.ForStatement {
-	// for → "for" "ident" "in" expr "do" block
+	// for → "for" expr "in" expr "do" stmts... "end"
+	// note: expr has to be assignable
 	node := &ast.ForStatement{Token: p.last(1)}
-	p.expect(scanner.TokenIdent)
-	p.last(1)
-	node.Binding = p.parseIdentifierLiteral().(*ast.IdentifierLiteral)
+	node.Binding = p.parseExpression()
+	if (!ast.Assignable(node.Binding)) {
+		p.errorToken("cannot assign to %s", node.Binding.Type())
+	}
 	p.expect(scanner.TokenIn)
 	node.Iterable = p.parseExpression()
 	p.expect(scanner.TokenDo)
-	node.Body = p.parseBlock()
+	node.Body = p.parseBlock(scanner.TokenEnd)
 	return node
 }

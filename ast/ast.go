@@ -54,9 +54,16 @@ func (node *ExpressionStatement) String() string {
 	return node.Expr.String() + ";"
 }
 
+// type IfStatement struct {
+// 	Token scanner.Token // the 'if' token
+// 	Cond  Expression
+// 	Then  *Block
+// 	Else  *Block
+// }
+
 type ForStatement struct {
 	Token    scanner.Token // the 'for' token
-	Binding  *IdentifierLiteral
+	Binding  Expression
 	Iterable Expression
 	Body     *Block
 }
@@ -77,6 +84,7 @@ func (node *ForStatement) String() string {
 
 type Block struct {
 	Statements []Statement
+	Terminal   scanner.Token
 }
 
 func (node *Block) statementNode() {}
@@ -86,9 +94,9 @@ func (node *Block) String() string {
 	out.WriteString(" ")
 	for _, stmt := range node.Statements {
 		out.WriteString(stmt.String())
-		out.WriteString("; ")
 	}
-	out.WriteString("end")
+	out.WriteString(" ")
+	out.WriteString(node.Terminal.Value)
 	return out.String()
 }
 

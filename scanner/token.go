@@ -28,6 +28,7 @@ const (
 	TokenWhile // 'while'
 	TokenIn    // 'in'
 	TokenDo    // 'do'
+	TokenIf    // 'if'
 	// Literals
 	TokenNil     // nil
 	TokenBoolean // true or false
@@ -69,6 +70,7 @@ var keywords = map[string]TokenType{
 	"while": TokenWhile,
 	"in":    TokenIn,
 	"do":    TokenDo,
+	"if":    TokenIf,
 	"nil":   TokenNil,
 	"true":  TokenBoolean,
 	"false": TokenBoolean,
