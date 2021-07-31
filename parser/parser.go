@@ -11,8 +11,8 @@ var EOFToken = scanner.Token{Type: scanner.TokenEOF}
 type Parser struct {
 	filename string
 	tokens   []scanner.Token // list of tokens from the scanner
-	read     int             // number of tokens read
-	errors   []ParserError   // parser errors encountered.
+	consumed int             // number of tokens consumed.
+	errors   []error         // parser errors encountered.
 	// precedences
 	prefixHandlers map[scanner.TokenType]prefixParseFn
 	infixHandlers  map[scanner.TokenType]infixParseFn
@@ -23,7 +23,7 @@ func New(filename string, tokens []scanner.Token) *Parser {
 	p := &Parser{
 		filename: filename,
 		tokens:   tokens,
-		read:     0,
+		consumed: 0,
 	}
 	p.initExpressions()
 	return p
@@ -39,8 +39,8 @@ func (p *Parser) MustParse() *ast.Program {
 
 // Program is the main entry point into the parser.
 func (p *Parser) Parse() (program *ast.Program, err error) {
-	// Internally, we use panic(...) but this method will wrap
-	// these panics into an error for the public API.
+	// Internally, we use panic(ParserError) to signal that
+	// there has been a parsing error.
 	defer func() {
 		if r := recover(); r != nil {
 			if pe, ok := r.(ParserError); ok {
@@ -58,64 +58,34 @@ func (p *Parser) Parse() (program *ast.Program, err error) {
 // Utility methods
 // ===============
 
-func (p *Parser) last(i int) scanner.Token { return p.tokens[p.read-i] }
-func (p *Parser) current() scanner.Token   { return p.lookAhead(0) }
+// peek returns the current token we have yet to consume
+func (p *Parser) peek() scanner.Token { return p.tokens[p.consumed] }
+func (p *Parser) isAtEnd() bool       { return p.peek().Type == scanner.TokenEOF }
 
-func (p *Parser) lookAhead(distance int) scanner.Token {
-	if p.read + distance > len(p.tokens) {
-		return EOFToken
-	}
-	return p.tokens[p.read+distance]
-}
-
-func (p *Parser) expect(t scanner.TokenType) scanner.Token {
-	if tokType := p.current().Type; tokType != t {
-		// for the error message.
-		p.consume()
-		p.errorToken("expected %s, got %s instead", t, tokType)
-	}
-	return p.consume()
-}
-
+// previous returns the previously consumed token
+func (p *Parser) previous() scanner.Token { return p.tokens[p.consumed-1] }
 func (p *Parser) consume() scanner.Token {
-	p.read++
-	return p.last(1)
+	if !p.isAtEnd() {
+		p.consumed++
+	}
+	return p.previous()
 }
 
-// isLookAhead looks ahead at the token stream, and returns
-// true if the lookahead stream matches the given types.
-func (p *Parser) lookAheadMatches(types ...scanner.TokenType) bool {
-	for i, tokenType := range types {
-		if p.lookAhead(i).Type != tokenType {
-			return false
-		}
-	}
-	return true
-}
-
-// match looks ahead at the token stream, and consumes
-// tokens if all of them match the given types.
-func (p *Parser) match(types ...scanner.TokenType) bool {
-	if !p.lookAheadMatches(types...) {
-		return false
-	}
-	// consume them
-	for i := 0; i < len(types); i++ {
+// match looks ahead at the token stream, and consumes 1
+// token if it matches the given type.
+func (p *Parser) match(typ scanner.TokenType) bool {
+	if p.peek().Type == typ {
 		p.consume()
-	}
-	return true
-}
-
-// matchAny consumes 1 token if it is _any_ of the given types.
-func (p *Parser) matchAny(types ...scanner.TokenType) bool {
-	curType := p.current().Type
-	for _, tokType := range types {
-		if curType == tokType {
-			p.consume()
-			return true
-		}
+		return true
 	}
 	return false
+}
+
+// expect is like match, but raises an error.
+func (p *Parser) expect(t scanner.TokenType) {
+	if !p.match(t) {
+		p.errorToken("expected %s, got %s instead", t, p.peek().Type)
+	}
 }
 
 // ===============
@@ -124,50 +94,44 @@ func (p *Parser) matchAny(types ...scanner.TokenType) bool {
 
 func (p *Parser) parseProgram() *ast.Program {
 	prog := &ast.Program{}
-	prog.Statements = []ast.Statement{}
-	p.match(scanner.TokenSeparator) // initial whitespace -- ignore
-	hasSep := true
-	for !p.match(scanner.TokenEOF) {
-		if !hasSep {
-			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
-		}
-		prog.Statements = append(prog.Statements, p.parseStatement())
-		hasSep = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
-	}
+	block := p.parseBlock(scanner.TokenEOF)
+	prog.Statements = block.Statements
 	return prog
 }
 
 func (p *Parser) parseStatement() ast.Statement {
-	switch {
-	case p.match(scanner.TokenFor):
+	switch p.peek().Type {
+	case scanner.TokenFor:
 		return p.parseForStatement()
+	default:
+		return &ast.ExpressionStatement{Expr: p.parseExpression()}
 	}
-	return &ast.ExpressionStatement{Expr: p.parseExpression()}
 }
 
 func (p *Parser) parseBlock(terminal scanner.TokenType) *ast.Block {
-	// block → blockStmts <terminal>
+	// block → ("sep")? blockStmts <terminal>
 	// blockStmts → nothing | stmt ("sep" blockStmts)?
 	lastHasSeparator := true
 	block := &ast.Block{}
 	block.Statements = []ast.Statement{}
+	p.match(scanner.TokenSeparator) // initial whitespace -- ignore
 	for !p.match(terminal) {
 		if !lastHasSeparator {
-			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
+			p.errorToken("expected newline or semicolon after statement")
 		}
 		block.Statements = append(block.Statements, p.parseStatement())
-		lastHasSeparator = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
+		lastHasSeparator = p.match(scanner.TokenSeparator)
 	}
-	block.Terminal = p.last(1)
+	block.Terminal = p.previous()
 	return block
 }
 
 func (p *Parser) parseForStatement() *ast.ForStatement {
 	// for → "for" expr "in" expr "do" stmts... "end"
 	// note: expr has to be assignable
-	node := &ast.ForStatement{Token: p.last(1)}
+	node := &ast.ForStatement{Token: p.consume()}
 	node.Binding = p.parseExpression()
-	if (!ast.Assignable(node.Binding)) {
+	if !ast.Assignable(node.Binding) {
 		p.errorToken("cannot assign to %s", node.Binding.Type())
 	}
 	p.expect(scanner.TokenIn)

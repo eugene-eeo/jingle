@@ -32,8 +32,8 @@ func printOkStart() {
 	)
 }
 
-func printErrors(errors []sc.Error) {
-	fmt.Printf("%s---- SCAN ERROR ----%s\n", ERR_FORMAT, ERR_RESET)
+func printErrors(errors []error) {
+	fmt.Printf("%s------ ERRORS ------%s\n", ERR_FORMAT, ERR_RESET)
 	for _, err := range errors {
 		fmt.Printf("%s\n", err)
 	}

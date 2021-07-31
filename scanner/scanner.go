@@ -16,6 +16,7 @@ type Error struct {
 	Column   int
 }
 
+func (e Error) Error() string { return e.String() }
 func (e Error) String() string {
 	return fmt.Sprintf("%s:%d:%d: %s", e.Filename, e.LineNo, e.Column, e.Message)
 }
@@ -32,7 +33,7 @@ type Scanner struct {
 	startCol  int
 	err       bool
 	tokens    []Token // list of tokens
-	errors    []Error // list of errors encountered
+	errors    []error // list of errors encountered
 }
 
 func New(filename string, input string) *Scanner {
@@ -44,7 +45,7 @@ func New(filename string, input string) *Scanner {
 		startLine: 1,
 		startCol:  1,
 		tokens:    []Token{},
-		errors:    []Error{},
+		errors:    []error{},
 	}
 }
 
@@ -58,7 +59,7 @@ func (s *Scanner) More() bool {
 }
 
 func (s *Scanner) Tokens() []Token { return s.tokens }
-func (s *Scanner) Errors() []Error {
+func (s *Scanner) Errors() []error {
 	if len(s.errors) == 0 {
 		return nil
 	}
@@ -154,8 +155,8 @@ func (s *Scanner) Scan() {
 		s.tokens = append(s.tokens, Token{TokenEOF, "", s.line, s.col})
 	case ' ', '\t':
 		s.munchWhitespace()
-	case '\r', '\n':
-		s.matchRun("\n\r \t")
+	case '\r', '\n', ';':
+		s.matchRun("\n\r \t;")
 		s.addToken(TokenSeparator)
 	case '/':
 		if s.match('/') {
@@ -213,8 +214,6 @@ func (s *Scanner) Scan() {
 		s.addToken(TokenLBracket)
 	case ']':
 		s.addToken(TokenRBracket)
-	case ';':
-		s.addToken(TokenSemicolon)
 	case '"':
 		s.scanString()
 	default:

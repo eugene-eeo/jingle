@@ -24,32 +24,31 @@ func _() {
 	_ = x[TokenNumber-13]
 	_ = x[TokenIdent-14]
 	_ = x[TokenComma-15]
-	_ = x[TokenSemicolon-16]
-	_ = x[TokenSeparator-17]
-	_ = x[TokenLParen-18]
-	_ = x[TokenRParen-19]
-	_ = x[TokenLBrace-20]
-	_ = x[TokenRBrace-21]
-	_ = x[TokenLBracket-22]
-	_ = x[TokenRBracket-23]
-	_ = x[TokenBang-24]
-	_ = x[TokenDot-25]
-	_ = x[TokenPlus-26]
-	_ = x[TokenMinus-27]
-	_ = x[TokenMul-28]
-	_ = x[TokenDiv-29]
-	_ = x[TokenSet-30]
-	_ = x[TokenEq-31]
-	_ = x[TokenNeq-32]
-	_ = x[TokenLt-33]
-	_ = x[TokenGt-34]
-	_ = x[TokenLeq-35]
-	_ = x[TokenGeq-36]
+	_ = x[TokenSeparator-16]
+	_ = x[TokenLParen-17]
+	_ = x[TokenRParen-18]
+	_ = x[TokenLBrace-19]
+	_ = x[TokenRBrace-20]
+	_ = x[TokenLBracket-21]
+	_ = x[TokenRBracket-22]
+	_ = x[TokenBang-23]
+	_ = x[TokenDot-24]
+	_ = x[TokenPlus-25]
+	_ = x[TokenMinus-26]
+	_ = x[TokenMul-27]
+	_ = x[TokenDiv-28]
+	_ = x[TokenSet-29]
+	_ = x[TokenEq-30]
+	_ = x[TokenNeq-31]
+	_ = x[TokenLt-32]
+	_ = x[TokenGt-33]
+	_ = x[TokenLeq-34]
+	_ = x[TokenGeq-35]
 }
 
-const _TokenType_name = "TokenEOFTokenOrTokenAndTokenFnTokenEndTokenForTokenWhileTokenInTokenDoTokenIfTokenNilTokenBooleanTokenStringTokenNumberTokenIdentTokenCommaTokenSemicolonTokenSeparatorTokenLParenTokenRParenTokenLBraceTokenRBraceTokenLBracketTokenRBracketTokenBangTokenDotTokenPlusTokenMinusTokenMulTokenDivTokenSetTokenEqTokenNeqTokenLtTokenGtTokenLeqTokenGeq"
+const _TokenType_name = "TokenEOFTokenOrTokenAndTokenFnTokenEndTokenForTokenWhileTokenInTokenDoTokenIfTokenNilTokenBooleanTokenStringTokenNumberTokenIdentTokenCommaTokenSeparatorTokenLParenTokenRParenTokenLBraceTokenRBraceTokenLBracketTokenRBracketTokenBangTokenDotTokenPlusTokenMinusTokenMulTokenDivTokenSetTokenEqTokenNeqTokenLtTokenGtTokenLeqTokenGeq"
 
-var _TokenType_index = [...]uint16{0, 8, 15, 23, 30, 38, 46, 56, 63, 70, 77, 85, 97, 108, 119, 129, 139, 153, 167, 178, 189, 200, 211, 224, 237, 246, 254, 263, 273, 281, 289, 297, 304, 312, 319, 326, 334, 342}
+var _TokenType_index = [...]uint16{0, 8, 15, 23, 30, 38, 46, 56, 63, 70, 77, 85, 97, 108, 119, 129, 139, 153, 164, 175, 186, 197, 210, 223, 232, 240, 249, 259, 267, 275, 283, 290, 298, 305, 312, 320, 328}
 
 func (i TokenType) String() string {
 	if i < 0 || i >= TokenType(len(_TokenType_index)-1) {

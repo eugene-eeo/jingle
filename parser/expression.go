@@ -77,7 +77,7 @@ func (p *Parser) parsePrecedence(precedence int) ast.Expression {
 		p.errorToken("expected expression, got %s", tok.Type)
 	}
 	left := prefixParser()
-	for precedence < p.getPrecedence(p.current().Type) {
+	for precedence < p.getPrecedence(p.peek().Type) {
 		// note -- we will never come here if p.getPrecedence()
 		// returned LOWEST, since all other precedences > LOWEST.
 		tok := p.consume()
@@ -101,7 +101,7 @@ func (p *Parser) getPrecedence(tok scanner.TokenType) int {
 
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// <left> <op> <right>
-	opToken := p.last(1)
+	opToken := p.previous()
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.InfixExpression{
 		Token: opToken,
@@ -118,7 +118,7 @@ func (p *Parser) parseAssigmentExpression(left ast.Expression) ast.Expression {
 		return nil // not reachable
 	}
 	return &ast.AssignmentExpression{
-		Token: p.last(1), // the '=' token
+		Token: p.previous(), // the '=' token
 		Left:  left,
 		Right: p.parsePrecedence(PREC_ASSIGNMENT - 1),
 	}
@@ -132,7 +132,7 @@ func (p *Parser) parseParens() ast.Expression {
 }
 
 func (p *Parser) parseOrExpression(left ast.Expression) ast.Expression {
-	opToken := p.last(1)
+	opToken := p.previous()
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.OrExpression{
 		Token: opToken,
@@ -142,7 +142,7 @@ func (p *Parser) parseOrExpression(left ast.Expression) ast.Expression {
 }
 
 func (p *Parser) parseAndExpression(left ast.Expression) ast.Expression {
-	opToken := p.last(1)
+	opToken := p.previous()
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.AndExpression{
 		Token: opToken,
@@ -153,7 +153,7 @@ func (p *Parser) parseAndExpression(left ast.Expression) ast.Expression {
 
 func (p *Parser) parseAttrExpression(left ast.Expression) ast.Expression {
 	// <left>.IDENT = <expr>
-	opToken := p.last(1)
+	opToken := p.previous()
 	right := p.parsePrecedence(PREC_DOT + 1)
 	if right.Type() != ast.IDENTIFIER_LITERAL {
 		p.errorToken("unexpected %s", right.Type())
@@ -170,22 +170,22 @@ func (p *Parser) parseAttrExpression(left ast.Expression) ast.Expression {
 // ========
 
 func (p *Parser) parseIdentifierLiteral() ast.Expression {
-	return &ast.IdentifierLiteral{Token: p.last(1)}
+	return &ast.IdentifierLiteral{Token: p.previous()}
 }
 
 func (p *Parser) parseBooleanLiteral() ast.Expression {
 	return &ast.BooleanLiteral{
-		Token: p.last(1),
-		Value: p.last(1).Value == "true",
+		Token: p.previous(),
+		Value: p.previous().Value == "true",
 	}
 }
 
 func (p *Parser) parseNullLiteral() ast.Expression {
-	return &ast.NilLiteral{Token: p.last(1)}
+	return &ast.NilLiteral{Token: p.previous()}
 }
 
 func (p *Parser) parseNumberLiteral() ast.Expression {
-	tok := p.last(1)
+	tok := p.previous()
 	val, err := strconv.ParseFloat(tok.Value, 64)
 	if err != nil {
 		p.errorToken("invalid number: %e", err)
@@ -194,14 +194,14 @@ func (p *Parser) parseNumberLiteral() ast.Expression {
 }
 
 func (p *Parser) parseStringLiteral() ast.Expression {
-	tok := p.last(1)
+	tok := p.previous()
 	return &ast.StringLiteral{Token: tok, Value: tok.Value}
 }
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	// fn → "fn" "(" params ")" stmt* "end"
 	// params → nothing | ident ("," | "," params)?
-	tok := p.last(1)
+	tok := p.previous()
 	fn := &ast.FunctionLiteral{
 		Token:  tok,
 		Params: []*ast.IdentifierLiteral{},
@@ -225,7 +225,7 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 func (p *Parser) parseArrayLiteral() ast.Expression {
 	// list → "[" listElems "]"
 	// listElems → nothing | <expr> ( "," | "," listElems )?
-	tok := p.last(1)
+	tok := p.previous()
 	arr := &ast.ArrayLiteral{Token: tok, Elems: []ast.Node{}}
 	for !p.match(scanner.TokenRBracket) {
 		node := p.parseExpression()

@@ -37,7 +37,6 @@ const (
 	TokenIdent   // identifier
 	// Delimiters
 	TokenComma     // ','
-	TokenSemicolon // ';'
 	TokenSeparator // any newlines (we are whitespace sensitive)
 	TokenLParen    // '('
 	TokenRParen    // ')'

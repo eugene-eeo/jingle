@@ -11,7 +11,8 @@ type ParserError struct {
 	Msg      string
 }
 
-func (pe ParserError) Error() string {
+func (pe ParserError) Error() string { return pe.String() }
+func (pe ParserError) String() string {
 	return fmt.Sprintf("%s:%d:%d:%s",
 		pe.Filename,
 		pe.Token.LineNo,
@@ -23,7 +24,7 @@ func (pe ParserError) Error() string {
 func (p *Parser) errorToken(s string, args ...interface{}) {
 	panic(ParserError{
 		Filename: p.filename,
-		Token:    p.last(1),
+		Token:    p.previous(),
 		Msg:      fmt.Sprintf(s, args...),
 	})
 }

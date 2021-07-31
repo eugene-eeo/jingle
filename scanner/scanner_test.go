@@ -37,7 +37,7 @@ nil == false`)
 		{scanner.TokenIdent, "b", 2, 6},
 		{scanner.TokenSet, "=", 2, 8},
 		{scanner.TokenNumber, "12.", 2, 10},
-		{scanner.TokenSemicolon, ";", 2, 13},
+		{scanner.TokenSeparator, ";", 2, 13},
 		{scanner.TokenIdent, "gab", 2, 15},
 		{scanner.TokenLBracket, "[", 2, 18},
 		{scanner.TokenIdent, "f", 2, 19},
