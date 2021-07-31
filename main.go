@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
-	"bufio"
 	"io"
-	sc "jingle/scanner"
 	"jingle/parser"
+	sc "jingle/scanner"
 	"os"
 	"reflect"
 	"strings"
