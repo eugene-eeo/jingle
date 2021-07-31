@@ -21,10 +21,18 @@ func (pe ParserError) String() string {
 	)
 }
 
-func (p *Parser) errorToken(s string, args ...interface{}) {
+func (p *Parser) error(s string, args ...interface{}) {
 	panic(ParserError{
 		Filename: p.filename,
 		Token:    p.previous(),
+		Msg:      fmt.Sprintf(s, args...),
+	})
+}
+
+func (p *Parser) errorToken(token scanner.Token, s string, args ...interface{}) {
+	panic(ParserError{
+		Filename: p.filename,
+		Token:    token,
 		Msg:      fmt.Sprintf(s, args...),
 	})
 }

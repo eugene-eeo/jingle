@@ -27,7 +27,7 @@ nil == false`)
 	t.Logf("%v", s.Tokens())
 	expected := []scanner.Token{
 		{scanner.TokenIdent, "a", 1, 1},
-		{scanner.TokenIdent, "let", 1, 3},
+		{scanner.TokenLet, "let", 1, 3},
 		{scanner.TokenIdent, "foobar", 1, 7},
 		{scanner.TokenSet, "=", 1, 14},
 		{scanner.TokenNumber, "1.5", 1, 16},
@@ -37,7 +37,7 @@ nil == false`)
 		{scanner.TokenIdent, "b", 2, 6},
 		{scanner.TokenSet, "=", 2, 8},
 		{scanner.TokenNumber, "12.", 2, 10},
-		{scanner.TokenSeparator, ";", 2, 13},
+		{scanner.TokenSeparator, "; ", 2, 13},
 		{scanner.TokenIdent, "gab", 2, 15},
 		{scanner.TokenLBracket, "[", 2, 18},
 		{scanner.TokenIdent, "f", 2, 19},
@@ -67,7 +67,7 @@ nil == false`)
 	tokens := s.Tokens()
 	for i, tok := range expected {
 		if tok != tokens[i] {
-			t.Logf("expected=%s, got=%s", tok, tokens[i])
+			t.Logf("expected=%+v, got=%+v", tok, tokens[i])
 			t.Fatalf("failed at index=%d", i)
 		}
 	}

@@ -29,6 +29,9 @@ const (
 	TokenIn    // 'in'
 	TokenDo    // 'do'
 	TokenIf    // 'if'
+	TokenThen  // 'then'
+	TokenElse  // 'else'
+	TokenLet   // 'let'
 	// Literals
 	TokenNil     // nil
 	TokenBoolean // true or false
@@ -70,6 +73,9 @@ var keywords = map[string]TokenType{
 	"in":    TokenIn,
 	"do":    TokenDo,
 	"if":    TokenIf,
+	"then":  TokenThen,
+	"else":  TokenElse,
+	"let":   TokenLet,
 	"nil":   TokenNil,
 	"true":  TokenBoolean,
 	"false": TokenBoolean,

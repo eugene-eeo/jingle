@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
+	"bufio"
 	"io"
 	sc "jingle/scanner"
 	"jingle/parser"
@@ -54,35 +54,35 @@ func main() {
 	var deep bool
 	flag.BoolVar(&deep, "deep", false, "recursively print ast")
 	flag.Parse()
-	scanner := bufio.NewScanner(os.Stdin)
-	for {
-		fmt.Print("> ")
-		if !scanner.Scan() {
-			break
-		}
-		input := string(scanner.Bytes())
-		lex := sc.New("<stdin>", input)
-		lex.ScanAll()
-		if lex.Errors() != nil {
-			printErrors(lex.Errors())
-			continue
-		}
-		p := parser.New("<stdin>", lex.Tokens())
-		program, err := p.Parse()
-		if err != nil {
-			printError(err)
-			continue
-		}
-		if deep {
-			printOkStart()
-			w := bufio.NewWriter(os.Stdout)
-			Frprint(w, program, 0)
-			w.WriteString("\n")
-			w.Flush()
-			printOkEnd()
-		} else {
-			fmt.Println(program.String())
-		}
+
+	str, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		printError(err)
+		return
+	}
+	input := string(str)
+	lex := sc.New("<stdin>", input)
+	lex.ScanAll()
+	if lex.Errors() != nil {
+		printErrors(lex.Errors())
+		return
+	}
+	// fmt.Println(lex.Tokens())
+	p := parser.New("<stdin>", lex.Tokens())
+	program, err := p.Parse()
+	if err != nil {
+		printError(err)
+		return
+	}
+	if deep {
+		printOkStart()
+		w := bufio.NewWriter(os.Stdout)
+		Frprint(w, program, 0)
+		w.WriteString("\n")
+		w.Flush()
+		printOkEnd()
+	} else {
+		fmt.Println(program.String())
 	}
 }
 
