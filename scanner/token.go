@@ -20,7 +20,6 @@ type TokenType int
 const (
 	TokenEOF = TokenType(iota) // signals that EOF is reached.
 	// Keywords
-	TokenLet   // 'let'
 	TokenOr    // 'or'
 	TokenAnd   // 'and'
 	TokenFn    // 'fn'
@@ -62,7 +61,6 @@ const (
 )
 
 var keywords = map[string]TokenType{
-	"let":   TokenLet,
 	"or":    TokenOr,
 	"and":   TokenAnd,
 	"fn":    TokenFn,

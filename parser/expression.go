@@ -8,9 +8,9 @@ import (
 
 type (
 	// parse prefix expression: <OP><EXPR>
-	prefixParseFn func() ast.Node
+	prefixParseFn func() ast.Expression
 	// parse infix expression: <EXPR><OP><EXPR>
-	infixParseFn func(ast.Node) ast.Node
+	infixParseFn func(ast.Expression) ast.Expression
 )
 
 const (
@@ -67,15 +67,14 @@ func (p *Parser) initExpressions() {
 // ===================
 // Simple Pratt parser
 // ===================
-func (p *Parser) parseExpression() ast.Node { return p.parsePrecedence(PREC_LOWEST) }
-func (p *Parser) parsePrecedence(precedence int) ast.Node {
+func (p *Parser) parseExpression() ast.Expression { return p.parsePrecedence(PREC_LOWEST) }
+func (p *Parser) parsePrecedence(precedence int) ast.Expression {
 	// must have a matching prefix parser, otherwise we cannot
 	// parse anything!
 	tok := p.consume()
-	// fmt.Printf("tok=%+v\n", tok)
 	prefixParser, ok := p.prefixHandlers[tok.Type]
 	if !ok {
-		p.errorToken("unrecognised expression: %q", tok.Type)
+		p.errorToken("expected expression, got %s", tok.Type)
 	}
 	left := prefixParser()
 	for precedence < p.getPrecedence(p.current().Type) {
@@ -100,7 +99,7 @@ func (p *Parser) getPrecedence(tok scanner.TokenType) int {
 // Expressions
 // ===========
 
-func (p *Parser) parseInfixExpression(left ast.Node) ast.Node {
+func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// <left> <op> <right>
 	opToken := p.last(1)
 	right := p.parsePrecedence(p.precedence[opToken.Type])
@@ -112,7 +111,7 @@ func (p *Parser) parseInfixExpression(left ast.Node) ast.Node {
 	}
 }
 
-func (p *Parser) parseAssigmentExpression(left ast.Node) ast.Node {
+func (p *Parser) parseAssigmentExpression(left ast.Expression) ast.Expression {
 	// <left> = <right>
 	if !ast.Assignable(left) {
 		p.errorToken("cannot assign to %s", left.Type())
@@ -125,14 +124,14 @@ func (p *Parser) parseAssigmentExpression(left ast.Node) ast.Node {
 	}
 }
 
-func (p *Parser) parseParens() ast.Node {
+func (p *Parser) parseParens() ast.Expression {
 	// This is a grouping operator.
 	expr := p.parseExpression()
 	p.expect(scanner.TokenRParen)
 	return expr
 }
 
-func (p *Parser) parseOrExpression(left ast.Node) ast.Node {
+func (p *Parser) parseOrExpression(left ast.Expression) ast.Expression {
 	opToken := p.last(1)
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.OrExpression{
@@ -142,7 +141,7 @@ func (p *Parser) parseOrExpression(left ast.Node) ast.Node {
 	}
 }
 
-func (p *Parser) parseAndExpression(left ast.Node) ast.Node {
+func (p *Parser) parseAndExpression(left ast.Expression) ast.Expression {
 	opToken := p.last(1)
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.AndExpression{
@@ -152,7 +151,7 @@ func (p *Parser) parseAndExpression(left ast.Node) ast.Node {
 	}
 }
 
-func (p *Parser) parseAttrExpression(left ast.Node) ast.Node {
+func (p *Parser) parseAttrExpression(left ast.Expression) ast.Expression {
 	// <left>.IDENT = <expr>
 	opToken := p.last(1)
 	right := p.parsePrecedence(PREC_DOT + 1)
@@ -170,22 +169,22 @@ func (p *Parser) parseAttrExpression(left ast.Node) ast.Node {
 // Literals
 // ========
 
-func (p *Parser) parseIdentifierLiteral() ast.Node {
+func (p *Parser) parseIdentifierLiteral() ast.Expression {
 	return &ast.IdentifierLiteral{Token: p.last(1)}
 }
 
-func (p *Parser) parseBooleanLiteral() ast.Node {
+func (p *Parser) parseBooleanLiteral() ast.Expression {
 	return &ast.BooleanLiteral{
 		Token: p.last(1),
 		Value: p.last(1).Value == "true",
 	}
 }
 
-func (p *Parser) parseNullLiteral() ast.Node {
+func (p *Parser) parseNullLiteral() ast.Expression {
 	return &ast.NilLiteral{Token: p.last(1)}
 }
 
-func (p *Parser) parseNumberLiteral() ast.Node {
+func (p *Parser) parseNumberLiteral() ast.Expression {
 	tok := p.last(1)
 	val, err := strconv.ParseFloat(tok.Value, 64)
 	if err != nil {
@@ -194,12 +193,12 @@ func (p *Parser) parseNumberLiteral() ast.Node {
 	return &ast.NumberLiteral{Token: tok, Value: val}
 }
 
-func (p *Parser) parseStringLiteral() ast.Node {
+func (p *Parser) parseStringLiteral() ast.Expression {
 	tok := p.last(1)
 	return &ast.StringLiteral{Token: tok, Value: tok.Value}
 }
 
-func (p *Parser) parseFunctionLiteral() ast.Node {
+func (p *Parser) parseFunctionLiteral() ast.Expression {
 	// fn → "fn" "(" params ")" block
 	// params → nothing | ident ("," | "," params)?
 	tok := p.last(1)
@@ -219,11 +218,11 @@ func (p *Parser) parseFunctionLiteral() ast.Node {
 			break
 		}
 	}
-	fn.Body = p.parseBlock().(*ast.Block)
+	fn.Body = p.parseBlock()
 	return fn
 }
 
-func (p *Parser) parseArrayLiteral() ast.Node {
+func (p *Parser) parseArrayLiteral() ast.Expression {
 	// list → "[" listElems "]"
 	// listElems → nothing | <expr> ( "," | "," listElems )?
 	tok := p.last(1)

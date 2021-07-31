@@ -27,7 +27,7 @@ nil == false`)
 	t.Logf("%v", s.Tokens())
 	expected := []scanner.Token{
 		{scanner.TokenIdent, "a", 1, 1},
-		{scanner.TokenLet, "let", 1, 3},
+		{scanner.TokenIdent, "let", 1, 3},
 		{scanner.TokenIdent, "foobar", 1, 7},
 		{scanner.TokenSet, "=", 1, 14},
 		{scanner.TokenNumber, "1.5", 1, 16},

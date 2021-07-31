@@ -12,44 +12,6 @@ import (
 // Statements
 // ========================
 
-func TestParseLetStatements(t *testing.T) {
-	tests := []struct {
-		input  string
-		output string
-		bindings []interface{}
-	}{
-		{"let a = b", "let (a = b)", []interface{}{ut.ASTAssign{ut.ASTIdent{"a"}, ut.ASTIdent{"b"}}}},
-		{"let foo = nil", "let (foo = nil)", []interface{}{ut.ASTAssign{ut.ASTIdent{"foo"}, ut.ASTNil{}}}},
-		{"let foo,abc=true", "let foo, (abc = true)", []interface{}{
-			ut.ASTIdent{"foo"},
-			ut.ASTAssign{ut.ASTIdent{"abc"}, ut.ASTBoolean{true}},
-		}},
-		{"let foo,bar,baz=nil", "let foo, bar, (baz = nil)", []interface{}{
-			ut.ASTIdent{"foo"},
-			ut.ASTIdent{"bar"},
-			ut.ASTAssign{ut.ASTIdent{"baz"}, ut.ASTNil{}},
-		}},
-		{"let [bar]=[1]", "let ([bar] = [1])", []interface{}{
-			ut.ASTAssign{
-				ut.ASTArray{ut.ASTIdent{"bar"}},
-				ut.ASTArray{ut.ASTNumber{1}},
-			},
-		}},
-	}
-	for i, tt := range tests {
-		node, ok := checkParseOneline(t, tt.input)
-		if !ok {
-			t.Fatalf("test[%d] failed", i)
-		}
-		if !ut.TestLetStatement(t, node, tt.bindings...) {
-			t.Fatalf("test[%d] failed", i)
-		}
-		if node.String() != tt.output {
-			t.Fatalf("test[%d] expected=%q, got=%q", i, tt.output, node.String())
-		}
-	}
-}
-
 // ========================
 // Literals
 // ========================
@@ -132,6 +94,33 @@ func TestParseShortCiruiting(t *testing.T) {
 	}
 }
 
+func TestParseAssignExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+		test     ut.ASTAssign
+	}{
+		{"u = 1", "(u = 1)", ut.ASTAssign{ut.ASTIdent{"u"}, ut.ASTNumber{1}}},
+		{"a = b = c", "(a = (b = c))", ut.ASTAssign{ut.ASTIdent{"a"}, ut.ASTAssign{ut.ASTIdent{"b"}, ut.ASTIdent{"c"}}}},
+		{"[a=b] = [c]", "([(a = b)] = [c])", ut.ASTAssign{
+			ut.ASTArray{ut.ASTAssign{ut.ASTIdent{"a"}, ut.ASTIdent{"b"}}},
+			ut.ASTArray{ut.ASTIdent{"c"}},
+		}},
+	}
+	for i, tt := range tests {
+		node, ok := checkParseOneline(t, tt.input)
+		if !ok {
+			t.Fatalf("test[%d] failed", i)
+		}
+		if node.String() != tt.expected {
+			t.Fatalf("test[%d] expected=%q, got=%q", i, tt.expected, node.String())
+		}
+		if !ut.TestAssignmentExpression(t, node, tt.test) {
+			t.Fatalf("test[%d] failed", i)
+		}
+	}
+}
+
 func TestPrecedence(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -181,9 +170,9 @@ func checkParseOneline(t *testing.T, input string) (ast.Node, bool) {
 		t.Errorf("failed with error:\n\t%s", err)
 		return nil, false
 	}
-	if len(program.Nodes) != 1 {
-		t.Errorf("expected len(program.Nodes)=1, got=%d", len(program.Nodes))
+	if len(program.Statements) != 1 {
+		t.Errorf("expected len(program.Statements)=1, got=%d", len(program.Statements))
 		return nil, false
 	}
-	return program.Nodes[0], true
+	return program.Statements[0], true
 }

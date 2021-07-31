@@ -19,20 +19,25 @@ type Statement interface {
 	statementNode()
 }
 
+type Expression interface {
+	Node
+	expressionNode()
+}
+
 // ===========================
 // 'Statements'
 // ===========================
 
 type Program struct {
-	Nodes []Node
+	Statements []Statement
 }
 
 func (node *Program) statementNode() {}
 func (node *Program) Type() NodeType { return PROGRAM }
 func (node *Program) String() string {
 	var out bytes.Buffer
-	last := len(node.Nodes) - 1
-	for i, stmt := range node.Nodes {
+	last := len(node.Statements) - 1
+	for i, stmt := range node.Statements {
 		out.WriteString(stmt.String())
 		if i != last {
 			out.WriteString("\n")
@@ -41,33 +46,24 @@ func (node *Program) String() string {
 	return out.String()
 }
 
-type LetStatement struct {
-	Token    scanner.Token
-	Bindings []Node
-}
+type ExpressionStatement struct{ Expr Expression }
 
-func (node *LetStatement) statementNode() {}
-func (node *LetStatement) Type() NodeType { return LET_STATEMENT }
-func (node *LetStatement) String() string {
-	var out bytes.Buffer
-	bindings := []string{}
-	for _, b := range node.Bindings {
-		bindings = append(bindings, b.String())
-	}
-	out.WriteString(node.Token.Value + " ")
-	out.WriteString(strings.Join(bindings, ", "))
-	return out.String()
+func (node *ExpressionStatement) statementNode() {}
+func (node *ExpressionStatement) Type() NodeType { return EXPRESSION_STATEMENT }
+func (node *ExpressionStatement) String() string {
+	return node.Expr.String() + ";"
 }
 
 type ForStatement struct {
 	Token    scanner.Token // the 'for' token
 	Binding  *IdentifierLiteral
-	Iterable Node
+	Iterable Expression
 	Body     *Block
 }
 
-func (node ForStatement) Type() NodeType { return FOR_STATEMENT }
-func (node ForStatement) String() string {
+func (node *ForStatement) statementNode() {}
+func (node *ForStatement) Type() NodeType { return FOR_STATEMENT }
+func (node *ForStatement) String() string {
 	var out bytes.Buffer
 	out.WriteString(node.Token.Value)
 	out.WriteString(" ")
@@ -80,14 +76,15 @@ func (node ForStatement) String() string {
 }
 
 type Block struct {
-	Nodes []Node
+	Statements []Statement
 }
 
-func (node Block) Type() NodeType { return BLOCK_EXPRESSION }
-func (node Block) String() string {
+func (node *Block) statementNode() {}
+func (node *Block) Type() NodeType { return BLOCK_EXPRESSION }
+func (node *Block) String() string {
 	var out bytes.Buffer
 	out.WriteString(" ")
-	for _, stmt := range node.Nodes {
+	for _, stmt := range node.Statements {
 		out.WriteString(stmt.String())
 		out.WriteString("; ")
 	}
@@ -102,11 +99,12 @@ func (node Block) String() string {
 type InfixExpression struct {
 	Token scanner.Token // the <op> token
 	Op    string
-	Left  Node
-	Right Node
+	Left  Expression
+	Right Expression
 }
 
-func (node *InfixExpression) Type() NodeType { return INFIX_EXPRESSION }
+func (node *InfixExpression) expressionNode() {}
+func (node *InfixExpression) Type() NodeType  { return INFIX_EXPRESSION }
 func (node *InfixExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -119,11 +117,12 @@ func (node *InfixExpression) String() string {
 
 type AssignmentExpression struct {
 	Token scanner.Token // the '=' token
-	Left  Node
-	Right Node
+	Left  Expression
+	Right Expression
 }
 
-func (node *AssignmentExpression) Type() NodeType { return ASSIGNMENT_EXPRESSION }
+func (node *AssignmentExpression) expressionNode() {}
+func (node *AssignmentExpression) Type() NodeType  { return ASSIGNMENT_EXPRESSION }
 func (node *AssignmentExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -139,11 +138,12 @@ type OrExpression struct {
 	// expressions -- it is easier for the evaluator to do this.
 	Token scanner.Token // the `||` token
 	Op    string
-	Left  Node
-	Right Node
+	Left  Expression
+	Right Expression
 }
 
-func (node *OrExpression) Type() NodeType { return OR_EXPRESSION }
+func (node *OrExpression) expressionNode() {}
+func (node *OrExpression) Type() NodeType  { return OR_EXPRESSION }
 func (node *OrExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -157,11 +157,12 @@ func (node *OrExpression) String() string {
 type AndExpression struct {
 	Token scanner.Token // the `&&` token
 	Op    string
-	Left  Node
-	Right Node
+	Left  Expression
+	Right Expression
 }
 
-func (node *AndExpression) Type() NodeType { return AND_EXPRESSION }
+func (node *AndExpression) expressionNode() {}
+func (node *AndExpression) Type() NodeType  { return AND_EXPRESSION }
 func (node *AndExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -174,12 +175,13 @@ func (node *AndExpression) String() string {
 
 type AttrExpression struct {
 	Token scanner.Token // the '.' token
-	Left  Node
+	Left  Expression
 	Right *IdentifierLiteral
 }
 
-func (node AttrExpression) Type() NodeType { return ATTR_EXPRESSION }
-func (node AttrExpression) String() string {
+func (node *AttrExpression) expressionNode() {}
+func (node *AttrExpression) Type() NodeType  { return ATTR_EXPRESSION }
+func (node *AttrExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
 	out.WriteString(node.Left.String())
@@ -197,23 +199,26 @@ type NilLiteral struct {
 	Token scanner.Token // the 'nil' token
 }
 
-func (node *NilLiteral) Type() NodeType { return NIL_LITERAL }
-func (node *NilLiteral) String() string { return node.Token.Value }
+func (node *NilLiteral) expressionNode() {}
+func (node *NilLiteral) Type() NodeType  { return NIL_LITERAL }
+func (node *NilLiteral) String() string  { return node.Token.Value }
 
 type BooleanLiteral struct {
 	Token scanner.Token // true/false token
 	Value bool
 }
 
-func (node *BooleanLiteral) Type() NodeType { return BOOLEAN_LITERAL }
-func (node *BooleanLiteral) String() string { return node.Token.Value }
+func (node *BooleanLiteral) expressionNode() {}
+func (node *BooleanLiteral) Type() NodeType  { return BOOLEAN_LITERAL }
+func (node *BooleanLiteral) String() string  { return node.Token.Value }
 
 type IdentifierLiteral struct {
 	Token scanner.Token // ident token
 }
 
-func (node *IdentifierLiteral) Type() NodeType { return IDENTIFIER_LITERAL }
-func (node *IdentifierLiteral) String() string { return node.Token.Value }
+func (node *IdentifierLiteral) expressionNode() {}
+func (node *IdentifierLiteral) Type() NodeType  { return IDENTIFIER_LITERAL }
+func (node *IdentifierLiteral) String() string  { return node.Token.Value }
 func (node *IdentifierLiteral) Name() string {
 	return node.Token.Value
 }
@@ -223,16 +228,18 @@ type NumberLiteral struct {
 	Value float64
 }
 
-func (node *NumberLiteral) Type() NodeType { return NUMBER_LITERAL }
-func (node *NumberLiteral) String() string { return node.Token.Value }
+func (node *NumberLiteral) expressionNode() {}
+func (node *NumberLiteral) Type() NodeType  { return NUMBER_LITERAL }
+func (node *NumberLiteral) String() string  { return node.Token.Value }
 
 type StringLiteral struct {
 	Token scanner.Token // string token
 	Value string
 }
 
-func (node *StringLiteral) Type() NodeType { return STRING_LITERAL }
-func (node *StringLiteral) String() string { return fmt.Sprintf("%q", node.Value) }
+func (node *StringLiteral) expressionNode() {}
+func (node *StringLiteral) Type() NodeType  { return STRING_LITERAL }
+func (node *StringLiteral) String() string  { return fmt.Sprintf("%q", node.Value) }
 
 type FunctionLiteral struct {
 	Token  scanner.Token // the 'fn' token
@@ -240,7 +247,8 @@ type FunctionLiteral struct {
 	Body   *Block
 }
 
-func (node *FunctionLiteral) Type() NodeType { return FUNCTION_LITERAL }
+func (node *FunctionLiteral) expressionNode() {}
+func (node *FunctionLiteral) Type() NodeType  { return FUNCTION_LITERAL }
 func (node *FunctionLiteral) String() string {
 	var buf bytes.Buffer
 	params := []string{}
@@ -261,7 +269,8 @@ type ArrayLiteral struct {
 	Elems []Node
 }
 
-func (node *ArrayLiteral) Type() NodeType { return ARRAY_LITERAL }
+func (node *ArrayLiteral) expressionNode() {}
+func (node *ArrayLiteral) Type() NodeType  { return ARRAY_LITERAL }
 func (node *ArrayLiteral) String() string {
 	var buf bytes.Buffer
 	elems := []string{}

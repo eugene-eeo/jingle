@@ -43,27 +43,6 @@ func TestNode(t *testing.T, node ast.Node, v interface{}) bool {
 // Statements
 // ==========
 
-func TestLetStatement(t *testing.T, node ast.Node, args ...interface{}) bool {
-	if !TestNodeType(t, node, ast.LET_STATEMENT) {
-		return false
-	}
-	letStmt := node.(*ast.LetStatement)
-	if !testTokenType(t, letStmt.Token, scanner.TokenLet) {
-		return false
-	}
-	if len(args) != len(letStmt.Bindings) {
-		t.Errorf("expected %d bindings, got=%d", len(args), len(letStmt.Bindings))
-		return false
-	}
-	for i, b := range letStmt.Bindings {
-		if !TestNode(t, b, args[i]) {
-			t.Errorf("args[%d]: expected=%+v got=%+v", i, args[i], b)
-			return false
-		}
-	}
-	return true
-}
-
 // ===========
 // Expressions
 // ===========

@@ -12,6 +12,7 @@ type Parser struct {
 	filename string
 	tokens   []scanner.Token // list of tokens from the scanner
 	read     int             // number of tokens read
+	errors   []ParserError   // parser errors encountered.
 	// precedences
 	prefixHandlers map[scanner.TokenType]prefixParseFn
 	infixHandlers  map[scanner.TokenType]infixParseFn
@@ -123,67 +124,44 @@ func (p *Parser) matchAny(types ...scanner.TokenType) bool {
 
 func (p *Parser) parseProgram() *ast.Program {
 	prog := &ast.Program{}
-	prog.Nodes = []ast.Node{}
+	prog.Statements = []ast.Statement{}
 	p.match(scanner.TokenSeparator) // initial whitespace -- ignore
 	hasSep := true
 	for !p.match(scanner.TokenEOF) {
 		if !hasSep {
 			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
-		prog.Nodes = append(prog.Nodes, p.parseStatement())
+		prog.Statements = append(prog.Statements, p.parseStatement())
 		hasSep = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
 	}
 	return prog
 }
 
-func (p *Parser) parseStatement() ast.Node {
+func (p *Parser) parseStatement() ast.Statement {
 	switch {
-	case p.match(scanner.TokenLet):
-		return p.parseLetStatement()
 	case p.match(scanner.TokenFor):
 		return p.parseForStatement()
 	}
-	return p.parseExpression()
+	return &ast.ExpressionStatement{Expr: p.parseExpression()}
 }
 
-func (p *Parser) parseLetStatement() *ast.LetStatement {
-	// let → "let" bindings
-	// bindings → assignable ("," bindings)?
-	letNode := &ast.LetStatement{Token: p.last(1)}
-	letNode.Bindings = []ast.Node{}
-	for {
-		node := p.parseExpression()
-		if !ast.Assignable(node) {
-			p.errorToken("cannot assign to %s", node.Type())
-		}
-		if node.Type() == ast.ARRAY_LITERAL {
-			p.errorToken("%s cannot be a top-level declaration", node.Type())
-		}
-		letNode.Bindings = append(letNode.Bindings, node)
-		if !p.match(scanner.TokenComma) {
-			break
-		}
-	}
-	return letNode
-}
-
-func (p *Parser) parseBlock() ast.Node {
+func (p *Parser) parseBlock() *ast.Block {
 	// block → blockStmts "end"
 	// blockStmts → nothing | stmt ("sep" blockStmts)?
 	lastHasSeparator := true
 	block := &ast.Block{}
-	block.Nodes = []ast.Node{}
+	block.Statements = []ast.Statement{}
 	for !p.match(scanner.TokenEnd) {
 		if !lastHasSeparator {
 			p.errorToken("expected newline or semicolon, got %s instead", p.current().Type)
 		}
-		block.Nodes = append(block.Nodes, p.parseStatement())
+		block.Statements = append(block.Statements, p.parseStatement())
 		lastHasSeparator = p.matchAny(scanner.TokenSeparator, scanner.TokenSemicolon)
 	}
 	return block
 }
 
-func (p *Parser) parseForStatement() ast.Node {
+func (p *Parser) parseForStatement() *ast.ForStatement {
 	// for → "for" "ident" "in" expr "do" block
 	node := &ast.ForStatement{Token: p.last(1)}
 	p.expect(scanner.TokenIdent)
@@ -192,6 +170,6 @@ func (p *Parser) parseForStatement() ast.Node {
 	p.expect(scanner.TokenIn)
 	node.Iterable = p.parseExpression()
 	p.expect(scanner.TokenDo)
-	node.Body = p.parseBlock().(*ast.Block)
+	node.Body = p.parseBlock()
 	return node
 }

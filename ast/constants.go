@@ -8,8 +8,8 @@ const (
 	_ = NodeType(iota)
 	PROGRAM
 	// Statements
-	LET_STATEMENT
 	FOR_STATEMENT
+	EXPRESSION_STATEMENT
 
 	// Expressions
 	INFIX_EXPRESSION
