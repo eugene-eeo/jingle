@@ -17,16 +17,18 @@ const (
 	PREC_LOWEST     = iota
 	PREC_ASSIGNMENT // assignment
 	PREC_IF         // x if foo else bar
-	PREC_DOT        // a.b or a[b]
+	PREC_INDEX      // a[b]
 	PREC_EQ         // ==, >=, !=
-	PREC_AND_OR     // &&, ||
+	PREC_AND_OR     // and, or
 	PREC_ADD        // addition, subtraction
 	PREC_PRODUCT    // multiplication
-	PREC_CALL       // func calls
+	PREC_CALL       // func/method calls, attr get
 )
 
 func (p *Parser) initExpressions() {
 	p.prefixHandlers = map[scanner.TokenType]prefixParseFn{
+		scanner.TokenMinus:    p.parsePrefixExpression,
+		scanner.TokenBang:     p.parsePrefixExpression,
 		scanner.TokenIdent:    p.parseIdentifierLiteral,
 		scanner.TokenNil:      p.parseNullLiteral,
 		scanner.TokenNumber:   p.parseNumberLiteral,
@@ -43,11 +45,11 @@ func (p *Parser) initExpressions() {
 		scanner.TokenDiv:      p.parseInfixExpression,
 		scanner.TokenGeq:      p.parseInfixExpression,
 		scanner.TokenLeq:      p.parseInfixExpression,
+		scanner.TokenEq:       p.parseInfixExpression,
+		scanner.TokenNeq:      p.parseInfixExpression,
 		scanner.TokenSet:      p.parseAssigmentExpression,
 		scanner.TokenOr:       p.parseOrExpression,
 		scanner.TokenAnd:      p.parseAndExpression,
-		scanner.TokenEq:       p.parseInfixExpression,
-		scanner.TokenNeq:      p.parseInfixExpression,
 		scanner.TokenDot:      p.parseAttrExpression,
 		scanner.TokenLBracket: p.parseIndexExpression,
 		scanner.TokenLParen:   p.parseCallExpression,
@@ -65,8 +67,8 @@ func (p *Parser) initExpressions() {
 		scanner.TokenNeq:      PREC_EQ,
 		scanner.TokenLeq:      PREC_EQ,
 		scanner.TokenGeq:      PREC_EQ,
-		scanner.TokenDot:      PREC_DOT,
-		scanner.TokenLBracket: PREC_DOT,
+		scanner.TokenDot:      PREC_CALL,
+		scanner.TokenLBracket: PREC_INDEX,
 		scanner.TokenLParen:   PREC_CALL,
 		scanner.TokenIf:       PREC_IF,
 	}
@@ -108,8 +110,19 @@ func (p *Parser) getPrecedence(tok scanner.TokenType) int {
 // Expressions
 // ===========
 
+func (p *Parser) parsePrefixExpression() ast.Expression {
+	// prefix → ("!" | "-") expr
+	opToken := p.previous()
+	right := p.parseExpression()
+	return &ast.PrefixExpression{
+		Token: opToken,
+		Op:    opToken.Value,
+		Expr:  right,
+	}
+}
+
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
-	// <left> <op> <right>
+	// infix → expr ("*" | "/" | "+" | "-" | ">" | "<" | "==" | "!=" | "<=" | ">=") expr
 	opToken := p.previous()
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.InfixExpression{
@@ -121,11 +134,10 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 }
 
 func (p *Parser) parseAssigmentExpression(left ast.Expression) ast.Expression {
-	// <left> = <right>
+	// assignment → expr "=" expr
 	if reason, ok := ast.Assignable(left, false); !ok {
 		p.errorToken(reason.GetToken(),
 			"cannot assign to %s", left.Type())
-		return nil // not reachable
 	}
 	return &ast.AssignmentExpression{
 		Token: p.previous(), // the '=' token
@@ -135,13 +147,14 @@ func (p *Parser) parseAssigmentExpression(left ast.Expression) ast.Expression {
 }
 
 func (p *Parser) parseParens() ast.Expression {
-	// This is a grouping operator.
+	// parens → "(" expr ")"
 	expr := p.parseExpression()
 	p.expect(scanner.TokenRParen)
 	return expr
 }
 
 func (p *Parser) parseOrExpression(left ast.Expression) ast.Expression {
+	// or → expr "or" expr
 	opToken := p.previous()
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.OrExpression{
@@ -152,6 +165,7 @@ func (p *Parser) parseOrExpression(left ast.Expression) ast.Expression {
 }
 
 func (p *Parser) parseAndExpression(left ast.Expression) ast.Expression {
+	// and → expr "and" expr
 	opToken := p.previous()
 	right := p.parsePrecedence(p.precedence[opToken.Type])
 	return &ast.AndExpression{
@@ -162,9 +176,9 @@ func (p *Parser) parseAndExpression(left ast.Expression) ast.Expression {
 }
 
 func (p *Parser) parseAttrExpression(left ast.Expression) ast.Expression {
-	// <left>.IDENT = <expr>
+	// attr → expr "." ident
 	opToken := p.previous()
-	right := p.parsePrecedence(PREC_DOT + 1)
+	right := p.parsePrecedence(PREC_CALL)
 	if right.Type() != ast.IDENTIFIER_LITERAL {
 		p.error("unexpected %s", right.Type())
 	}
@@ -254,31 +268,34 @@ func (p *Parser) parseNumberLiteral() ast.Expression {
 }
 
 func (p *Parser) parseStringLiteral() ast.Expression {
-	tok := p.previous()
-	return &ast.StringLiteral{Token: tok, Value: tok.Value}
+	return &ast.StringLiteral{
+		Token: p.previous(),
+		Value: p.previous().Value,
+	}
 }
 
-func (p *Parser) parseFunctionLiteral() ast.Expression {
-	// fn → "fn" "(" params ")" stmt* "end"
-	// params → nothing | ident ("," | "," params)?
-	tok := p.previous()
-	fn := &ast.FunctionLiteral{
-		Token:  tok,
-		Params: []*ast.IdentifierLiteral{},
-	}
-	// parse the parameters
-	p.expect(scanner.TokenLParen)
+func (p *Parser) parseParams() []*ast.IdentifierLiteral {
+	// params → nothing | "ident" ("," | "," params)?
+	params := []*ast.IdentifierLiteral{}
 	for !p.match(scanner.TokenRParen) {
 		p.expect(scanner.TokenIdent)
 		ident := p.parseIdentifierLiteral()
-		fn.Params = append(fn.Params, ident.(*ast.IdentifierLiteral))
+		params = append(params, ident.(*ast.IdentifierLiteral))
 		if !p.match(scanner.TokenComma) {
 			// dont have a comma -- must be an RPAREN
 			p.expect(scanner.TokenRParen)
 			break
 		}
 	}
-	fn.Body = p.parseBlock(scanner.TokenEnd)
+	return params
+}
+
+func (p *Parser) parseFunctionLiteral() ast.Expression {
+	// fn → "fn" "(" params ")" stmt* "end"
+	fn := &ast.FunctionLiteral{Token: p.previous()}
+	p.expect(scanner.TokenLParen)
+	fn.Params = p.parseParams()
+	fn.Body = p.parseBlock(false, true, scanner.TokenEnd)
 	return fn
 }
 

@@ -26,28 +26,24 @@ type Expression interface {
 }
 
 // ===========================
-// 'Statements'
+// Statements
 // ===========================
 
 type Program struct {
-	Block
+	Token      scanner.Token
+	Statements []Statement
 }
 
-func (node *Program) statementNode() {}
-func (node *Program) Type() NodeType { return PROGRAM }
-
-// func (node *Program) GetToken() Token { return EOFToken }
-// func (node *Program) String() string {
-// 	var out bytes.Buffer
-// 	last := len(node.Statements) - 1
-// 	for i, stmt := range node.Statements {
-// 		out.WriteString(stmt.String())
-// 		if i != last {
-// 			out.WriteString("\n")
-// 		}
-// 	}
-// 	return out.String()
-// }
+func (node *Program) statementNode()          {}
+func (node *Program) Type() NodeType          { return PROGRAM }
+func (node *Program) GetToken() scanner.Token { return node.Token }
+func (node *Program) String() string {
+	var out bytes.Buffer
+	for _, stmt := range node.Statements {
+		out.WriteString(stmt.String())
+	}
+	return out.String()
+}
 
 type ExpressionStatement struct{ Expr Expression }
 
@@ -137,9 +133,92 @@ func (node *IfStatement) String() string {
 	return out.String()
 }
 
+type MethodDeclaration struct {
+	Token  scanner.Token // the 'def' token
+	Name   string
+	Params []*IdentifierLiteral
+	Body   *Block
+}
+
+func (node *MethodDeclaration) statementNode()          {}
+func (node *MethodDeclaration) Type() NodeType          { return METHOD_DECLARATION }
+func (node *MethodDeclaration) GetToken() scanner.Token { return node.Token }
+func (node *MethodDeclaration) String() string {
+	var out bytes.Buffer
+	params := []string{}
+	for _, param := range node.Params {
+		params = append(params, param.String())
+	}
+	out.WriteString(node.Token.Value)
+	out.WriteString(" ")
+	out.WriteString(node.Name)
+	out.WriteString("(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(")")
+	out.WriteString(node.Body.String())
+	return out.String()
+}
+
+type ClassStatement struct {
+	Token      scanner.Token // the 'class' token
+	Name       *IdentifierLiteral
+	SuperClass Expression
+	Body       *Block
+}
+
+func (node *ClassStatement) statementNode()          {}
+func (node *ClassStatement) Type() NodeType          { return CLASS_STATEMENT }
+func (node *ClassStatement) GetToken() scanner.Token { return node.Token }
+func (node *ClassStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(node.Token.Value)
+	out.WriteString(" ")
+	out.WriteString(node.Name.String())
+	if node.SuperClass != nil {
+		out.WriteString(" < ")
+		out.WriteString(node.SuperClass.String())
+	}
+	out.WriteString(node.Body.String())
+	return out.String()
+}
+
+type ReturnStatement struct {
+	Token scanner.Token // the 'return' token
+	Expr  Expression
+}
+
+func (node *ReturnStatement) statementNode()          {}
+func (node *ReturnStatement) Type() NodeType          { return RETURN_STATEMENT }
+func (node *ReturnStatement) GetToken() scanner.Token { return node.Token }
+func (node *ReturnStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(node.Token.Value)
+	out.WriteString(" ")
+	out.WriteString(node.Expr.String())
+	return out.String()
+}
+
 // ===========================
 // Expressions
 // ===========================
+
+type PrefixExpression struct {
+	Token scanner.Token // the <op> token
+	Op    string
+	Expr  Expression
+}
+
+func (node *PrefixExpression) expressionNode()         {}
+func (node *PrefixExpression) Type() NodeType          { return PREFIX_EXPRESSION }
+func (node *PrefixExpression) GetToken() scanner.Token { return node.Token }
+func (node *PrefixExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(node.Token.Value)
+	out.WriteString(node.Expr.String())
+	out.WriteString(")")
+	return out.String()
+}
 
 type InfixExpression struct {
 	Token scanner.Token // the <op> token

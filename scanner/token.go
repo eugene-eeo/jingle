@@ -20,18 +20,21 @@ type TokenType int
 const (
 	TokenEOF = TokenType(iota) // signals that EOF is reached.
 	// Keywords
-	TokenOr    // 'or'
-	TokenAnd   // 'and'
-	TokenFn    // 'fn'
-	TokenEnd   // 'end'
-	TokenFor   // 'for'
-	TokenWhile // 'while'
-	TokenIn    // 'in'
-	TokenDo    // 'do'
-	TokenIf    // 'if'
-	TokenThen  // 'then'
-	TokenElse  // 'else'
-	TokenLet   // 'let'
+	TokenOr     // 'or'
+	TokenAnd    // 'and'
+	TokenFn     // 'fn'
+	TokenEnd    // 'end'
+	TokenFor    // 'for'
+	TokenWhile  // 'while'
+	TokenIn     // 'in'
+	TokenDo     // 'do'
+	TokenIf     // 'if'
+	TokenThen   // 'then'
+	TokenElse   // 'else'
+	TokenLet    // 'let'
+	TokenClass  // 'class'
+	TokenDef    // 'def'
+	TokenReturn // 'return'
 	// Literals
 	TokenNil     // nil
 	TokenBoolean // true or false
@@ -64,19 +67,22 @@ const (
 )
 
 var keywords = map[string]TokenType{
-	"or":    TokenOr,
-	"and":   TokenAnd,
-	"fn":    TokenFn,
-	"end":   TokenEnd,
-	"for":   TokenFor,
-	"while": TokenWhile,
-	"in":    TokenIn,
-	"do":    TokenDo,
-	"if":    TokenIf,
-	"then":  TokenThen,
-	"else":  TokenElse,
-	"let":   TokenLet,
-	"nil":   TokenNil,
-	"true":  TokenBoolean,
-	"false": TokenBoolean,
+	"or":     TokenOr,
+	"and":    TokenAnd,
+	"fn":     TokenFn,
+	"end":    TokenEnd,
+	"for":    TokenFor,
+	"while":  TokenWhile,
+	"in":     TokenIn,
+	"do":     TokenDo,
+	"if":     TokenIf,
+	"then":   TokenThen,
+	"else":   TokenElse,
+	"let":    TokenLet,
+	"class":  TokenClass,
+	"def":    TokenDef,
+	"return": TokenReturn,
+	"nil":    TokenNil,
+	"true":   TokenBoolean,
+	"false":  TokenBoolean,
 }

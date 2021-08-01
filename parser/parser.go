@@ -95,12 +95,14 @@ func (p *Parser) expect(t scanner.TokenType) {
 
 func (p *Parser) parseProgram() *ast.Program {
 	prog := &ast.Program{}
-	block := p.parseBlock(scanner.TokenEOF)
+	block := p.parseBlock(false, false, scanner.TokenEOF)
 	prog.Statements = block.Statements
 	return prog
 }
 
 func (p *Parser) parseStatement() ast.Statement {
+	// stmt → let | for | if | exprstmt
+	// exprstmt → expr
 	switch p.peek().Type {
 	case scanner.TokenLet:
 		return p.parseLetStatement()
@@ -108,12 +110,18 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseForStatement()
 	case scanner.TokenIf:
 		return p.parseIfStatement()
+	case scanner.TokenClass:
+		return p.parseClassStatement()
 	default:
 		return &ast.ExpressionStatement{Expr: p.parseExpression()}
 	}
 }
 
-func (p *Parser) parseBlock(terminal ...scanner.TokenType) *ast.Block {
+func (p *Parser) parseBlock(
+	isClass bool,
+	isFunc bool,
+	terminal ...scanner.TokenType,
+) *ast.Block {
 	// block → ("sep")? blockStmts <terminal>
 	// blockStmts → nothing | stmt ("sep" blockStmts)?
 	lastHasSeparator := true
@@ -124,7 +132,22 @@ func (p *Parser) parseBlock(terminal ...scanner.TokenType) *ast.Block {
 		if !lastHasSeparator {
 			p.error("expected newline or semicolon after statement")
 		}
-		block.Statements = append(block.Statements, p.parseStatement())
+		var stmt ast.Statement
+		switch p.peek().Type {
+		case scanner.TokenDef:
+			if !isClass {
+				p.error("method declaration outside of class")
+			}
+			stmt = p.parseMethodDeclaration()
+		case scanner.TokenReturn:
+			if !isFunc {
+				p.error("return statement outside of function")
+			}
+			stmt = p.parseReturnStatement()
+		default:
+			stmt = p.parseStatement()
+		}
+		block.Statements = append(block.Statements, stmt)
 		lastHasSeparator = p.match(scanner.TokenSeparator)
 	}
 	block.Terminal = p.previous()
@@ -147,10 +170,10 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 	node := &ast.IfStatement{Token: p.consume()}
 	node.Cond = p.parseExpression()
 	p.expect(scanner.TokenThen)
-	thenBlock := p.parseBlock(scanner.TokenEnd, scanner.TokenElse)
+	thenBlock := p.parseBlock(false, false, scanner.TokenEnd, scanner.TokenElse)
 	node.Then = thenBlock
 	if thenBlock.Terminal.Type == scanner.TokenElse {
-		elseBlock := p.parseBlock(scanner.TokenEnd)
+		elseBlock := p.parseBlock(false, false, scanner.TokenEnd)
 		node.Else = elseBlock
 	}
 	return node
@@ -168,6 +191,78 @@ func (p *Parser) parseForStatement() *ast.ForStatement {
 	p.expect(scanner.TokenIn)
 	node.Iterable = p.parseExpression()
 	p.expect(scanner.TokenDo)
-	node.Body = p.parseBlock(scanner.TokenEnd)
+	node.Body = p.parseBlock(false, false, scanner.TokenEnd)
 	return node
+}
+
+func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
+	// return → "return" expr
+	node := &ast.ReturnStatement{Token: p.consume()}
+	node.Expr = p.parseExpression()
+	return node
+}
+
+func (p *Parser) parseClassStatement() *ast.ClassStatement {
+	// class → "class" ident ( "<" expr )? classDecls "end"
+	// classDecls → nothing | "sep" | (methodDecl | stmt) ( "sep" | "sep" classDecls )?
+	class := &ast.ClassStatement{Token: p.consume()}
+	p.expect(scanner.TokenIdent)
+	class.Name = p.parseIdentifierLiteral().(*ast.IdentifierLiteral)
+	if p.match(scanner.TokenLt) {
+		// subclass
+		class.SuperClass = p.parseExpression()
+	}
+	class.Body = p.parseBlock(true, false, scanner.TokenEnd)
+	return class
+}
+
+func (p *Parser) parseMethodDeclaration() *ast.MethodDeclaration {
+	// methodDecl → "def" methodName "(" params ")" block "end"
+	// we're on top of a 'def' token.
+	meth := &ast.MethodDeclaration{Token: p.previous()}
+	meth.Name = p.parseMethodName()
+	p.expect(scanner.TokenLParen)
+	meth.Params = p.parseParams()
+	meth.Body = p.parseBlock(false, true, scanner.TokenEnd)
+	return meth
+}
+
+func (p *Parser) parseMethodName() string {
+	// methodName → (ident
+	//               | "[" "]" ("=")?
+	//               | "+" | "-" | "*" | "/"
+	//               | ">" | ">=" | "<" | "<=" | "==" | "!=")
+	tok := p.consume()
+	switch tok.Type {
+	case scanner.TokenIdent:
+		return tok.Value
+	case scanner.TokenLBracket:
+		p.expect(scanner.TokenRBracket)
+		if p.match(scanner.TokenSet) {
+			return "[]="
+		}
+		return "[]"
+	case scanner.TokenPlus:
+		return "+"
+	case scanner.TokenMinus:
+		return "-"
+	case scanner.TokenMul:
+		return "*"
+	case scanner.TokenDiv:
+		return "/"
+	case scanner.TokenGt:
+		return ">"
+	case scanner.TokenGeq:
+		return ">="
+	case scanner.TokenLt:
+		return "<"
+	case scanner.TokenLeq:
+		return "<="
+	case scanner.TokenEq:
+		return "=="
+	case scanner.TokenNeq:
+		return "!="
+	}
+	p.error("invalid method name")
+	return "" // unreachable
 }
