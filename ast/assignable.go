@@ -11,6 +11,8 @@ func Assignable(node Node, isDeclaration bool) (Node, bool) {
 		return Assignable(node.Left, isDeclaration)
 	case *AttrExpression:
 		return node, !isDeclaration
+	case *IndexExpression:
+		return node, !isDeclaration
 	case *IdentifierLiteral:
 		return node, true
 	case *ArrayLiteral:

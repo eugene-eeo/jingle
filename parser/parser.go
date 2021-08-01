@@ -219,50 +219,53 @@ func (p *Parser) parseClassStatement() *ast.ClassStatement {
 func (p *Parser) parseMethodDeclaration() *ast.MethodDeclaration {
 	// methodDecl → "def" methodName "(" params ")" block "end"
 	// we're on top of a 'def' token.
-	meth := &ast.MethodDeclaration{Token: p.previous()}
-	meth.Name = p.parseMethodName()
+	meth := &ast.MethodDeclaration{Token: p.consume()}
+	meth.MethodName = p.parseMethodName()
 	p.expect(scanner.TokenLParen)
 	meth.Params = p.parseParams()
 	meth.Body = p.parseBlock(false, true, scanner.TokenEnd)
 	return meth
 }
 
-func (p *Parser) parseMethodName() string {
+func (p *Parser) parseMethodName() ast.MethodName {
 	// methodName → (ident
 	//               | "[" "]" ("=")?
 	//               | "+" | "-" | "*" | "/"
 	//               | ">" | ">=" | "<" | "<=" | "==" | "!=")
+	var name string
 	tok := p.consume()
 	switch tok.Type {
 	case scanner.TokenIdent:
-		return tok.Value
+		name = tok.Value
 	case scanner.TokenLBracket:
 		p.expect(scanner.TokenRBracket)
 		if p.match(scanner.TokenSet) {
-			return "[]="
+			name = "[]="
+		} else {
+			name = "[]"
 		}
-		return "[]"
 	case scanner.TokenPlus:
-		return "+"
+		name = "+"
 	case scanner.TokenMinus:
-		return "-"
+		name = "-"
 	case scanner.TokenMul:
-		return "*"
+		name = "*"
 	case scanner.TokenDiv:
-		return "/"
+		name = "/"
 	case scanner.TokenGt:
-		return ">"
+		name = ">"
 	case scanner.TokenGeq:
-		return ">="
+		name = ">="
 	case scanner.TokenLt:
-		return "<"
+		name = "<"
 	case scanner.TokenLeq:
-		return "<="
+		name = "<="
 	case scanner.TokenEq:
-		return "=="
+		name = "=="
 	case scanner.TokenNeq:
-		return "!="
+		name = "!="
+	default:
+		p.error("invalid method name")
 	}
-	p.error("invalid method name")
-	return "" // unreachable
+	return ast.MethodName{Token: tok, Name: name}
 }

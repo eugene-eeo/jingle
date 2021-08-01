@@ -22,6 +22,7 @@ const (
 	PREC_AND_OR     // and, or
 	PREC_ADD        // addition, subtraction
 	PREC_PRODUCT    // multiplication
+	PREC_PREFIX     // ! or -
 	PREC_CALL       // func/method calls, attr get
 )
 
@@ -113,7 +114,7 @@ func (p *Parser) getPrecedence(tok scanner.TokenType) int {
 func (p *Parser) parsePrefixExpression() ast.Expression {
 	// prefix → ("!" | "-") expr
 	opToken := p.previous()
-	right := p.parseExpression()
+	right := p.parsePrecedence(PREC_PREFIX)
 	return &ast.PrefixExpression{
 		Token: opToken,
 		Op:    opToken.Value,
@@ -232,9 +233,9 @@ func (p *Parser) parseIfElseExpression(left ast.Expression) ast.Expression {
 	// ifElse → expr "if" expr ("else" expr)
 	node := &ast.IfElseExpression{Token: p.previous()}
 	node.Then = left
-	node.Cond = p.parseExpression()
+	node.Cond = p.parsePrecedence(PREC_IF)
 	if p.match(scanner.TokenElse) {
-		node.Else = p.parseExpression()
+		node.Else = p.parsePrecedence(PREC_IF)
 	}
 	return node
 }

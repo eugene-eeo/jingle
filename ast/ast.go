@@ -92,6 +92,25 @@ func (node *ForStatement) String() string {
 	return out.String()
 }
 
+type WhileStatement struct {
+	Token     scanner.Token // the 'while' token
+	Condition Expression
+	Body      *Block
+}
+
+func (node *WhileStatement) statementNode()          {}
+func (node *WhileStatement) Type() NodeType          { return WHILE_STATEMENT }
+func (node *WhileStatement) GetToken() scanner.Token { return node.Token }
+func (node *WhileStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(node.Token.Value)
+	out.WriteString(" ")
+	out.WriteString(node.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(node.Body.String())
+	return out.String()
+}
+
 type Block struct {
 	Statements []Statement
 	Terminal   scanner.Token
@@ -133,11 +152,16 @@ func (node *IfStatement) String() string {
 	return out.String()
 }
 
+type MethodName struct {
+	Token scanner.Token
+	Name  string
+}
+
 type MethodDeclaration struct {
-	Token  scanner.Token // the 'def' token
-	Name   string
-	Params []*IdentifierLiteral
-	Body   *Block
+	Token      scanner.Token // the 'def' token
+	MethodName MethodName
+	Params     []*IdentifierLiteral
+	Body       *Block
 }
 
 func (node *MethodDeclaration) statementNode()          {}
@@ -151,7 +175,7 @@ func (node *MethodDeclaration) String() string {
 	}
 	out.WriteString(node.Token.Value)
 	out.WriteString(" ")
-	out.WriteString(node.Name)
+	out.WriteString(node.MethodName.Name)
 	out.WriteString("(")
 	out.WriteString(strings.Join(params, ", "))
 	out.WriteString(")")
@@ -378,6 +402,7 @@ func (node *IfElseExpression) Type() NodeType          { return IF_ELSE_EXPRESSI
 func (node *IfElseExpression) GetToken() scanner.Token { return node.Token }
 func (node *IfElseExpression) String() string {
 	var out bytes.Buffer
+	out.WriteString("(")
 	out.WriteString(node.Then.String())
 	out.WriteString(" ")
 	out.WriteString(node.Token.Value)
@@ -387,6 +412,7 @@ func (node *IfElseExpression) String() string {
 		out.WriteString(" else ")
 		out.WriteString(node.Else.String())
 	}
+	out.WriteString(")")
 	return out.String()
 }
 
