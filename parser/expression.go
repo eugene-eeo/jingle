@@ -48,7 +48,7 @@ func (p *Parser) initExpressions() {
 		scanner.TokenLeq:      p.parseInfixExpression,
 		scanner.TokenEq:       p.parseInfixExpression,
 		scanner.TokenNeq:      p.parseInfixExpression,
-		scanner.TokenSet:      p.parseAssigmentExpression,
+		scanner.TokenSet:      p.parseAssignmentExpression,
 		scanner.TokenOr:       p.parseOrExpression,
 		scanner.TokenAnd:      p.parseAndExpression,
 		scanner.TokenDot:      p.parseAttrExpression,
@@ -134,7 +134,7 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	}
 }
 
-func (p *Parser) parseAssigmentExpression(left ast.Expression) ast.Expression {
+func (p *Parser) parseAssignmentExpression(left ast.Expression) ast.Expression {
 	// assignment → expr "=" expr
 	if reason, ok := ast.Assignable(left, false); !ok {
 		p.errorToken(reason.GetToken(),

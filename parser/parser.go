@@ -104,8 +104,6 @@ func (p *Parser) parseStatement() ast.Statement {
 	// stmt → let | for | if | exprstmt
 	// exprstmt → expr
 	switch p.peek().Type {
-	case scanner.TokenLet:
-		return p.parseLetStatement()
 	case scanner.TokenFor:
 		return p.parseForStatement()
 	case scanner.TokenIf:
@@ -136,11 +134,13 @@ func (p *Parser) parseBlock(
 		switch p.peek().Type {
 		case scanner.TokenDef:
 			if !isClass {
+				p.consume()
 				p.error("method declaration outside of class")
 			}
 			stmt = p.parseMethodDeclaration()
 		case scanner.TokenReturn:
 			if !isFunc {
+				p.consume()
 				p.error("return statement outside of function")
 			}
 			stmt = p.parseReturnStatement()
